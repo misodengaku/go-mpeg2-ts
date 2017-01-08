@@ -14,12 +14,15 @@ const (
 	AdaptationField_AdaptationFieldFollowed = 3
 )
 
-func (p *Mpeg2TSPacket) Load(data []byte) error {
+func (p *Mpeg2TSPacket) Load(data []byte, index int) error {
 	if len(data) != 188 {
 		return errors.New("size mismatch")
 	}
 
-	p.Data = data
+	p.Index = index
+	p.Data = make([]byte, 188)
+	copy(p.Data, data)
+	// p.Data = *(&data)
 	return nil
 }
 

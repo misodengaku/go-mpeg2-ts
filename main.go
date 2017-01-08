@@ -45,7 +45,7 @@ func main() {
 			break
 		}
 
-		mpeg2.Packets[i].Load(buf)
+		mpeg2.Packets[i].Load(buf, i)
 		mpeg2.Packets[i].ParseHeader()
 		// go func() {
 
@@ -90,5 +90,12 @@ func main() {
 		fmt.Println(err.Error())
 	} else {
 		fmt.Println("OK")
+	}
+
+	pat := mpeg2.PIDFilter(mpeg2ts.PID_PAT)
+	for _, p := range pat.Packets {
+		// fmt.Println("PAT frame:", p.Index, p.PID, p.Data)
+		patx, _ := p.ParsePAT()
+		fmt.Printf("%#v\r\n", patx)
 	}
 }
