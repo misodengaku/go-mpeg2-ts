@@ -92,10 +92,21 @@ func main() {
 		fmt.Println("OK")
 	}
 
-	pat := mpeg2.PIDFilter(mpeg2ts.PID_PAT)
-	for _, p := range pat.Packets {
-		// fmt.Println("PAT frame:", p.Index, p.PID, p.Data)
-		patx, _ := p.ParsePAT()
-		fmt.Printf("%#v\r\n", patx)
+	// go func() {
+	// 	pat := mpeg2.PIDFilter(mpeg2ts.PID_PAT)
+	// 	for _, p := range pat.Packets {
+	// 		// fmt.Println("PAT frame:", p.Index, p.PID, p.Data)
+	// 		patx, _ := p.ParsePAT()
+	// 		fmt.Printf("%#v\r\n", patx)
+	// 	}
+	// }()
+	// var ch chan struct{}
+	// go func() {
+	pmt := mpeg2.PIDFilter(mpeg2ts.PID_EIT)
+	for _, p := range pmt.Packets {
+		fmt.Printf("%#v\r\n", p)
 	}
+	// 	ch <- struct{}{}
+	// }()
+	// <-ch
 }
