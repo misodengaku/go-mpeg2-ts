@@ -85,4 +85,10 @@ func main() {
 		// }
 
 	}
+	fmt.Println("Continuity check")
+	if err := mpeg2.CheckStream(); err != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println("OK")
+	}
 }
