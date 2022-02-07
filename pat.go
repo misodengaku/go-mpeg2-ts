@@ -1,10 +1,7 @@
 package mpeg2ts
 
 import (
-	"errors"
 	"fmt"
-
-	"github.com/snksoft/crc"
 )
 
 type PATTable struct {
@@ -37,7 +34,7 @@ func (p *Packet) ParsePAT() (*PATTable, error) {
 	pat.TableID = payload[1]
 	pat.SectionSyntaxIndicator = ((payload[2] >> 7) & 0x01) == 1
 	if ((payload[2] >> 6) & 0x01) == 1 {
-		return nil, errors.New("invalid format")
+		return nil, fmt.Errorf("invalid format")
 	}
 	pat.SectionLength = uint16(payload[2]&0x0F)<<8 | uint16(payload[3])
 	pat.TransportStreamID = uint16(payload[4])<<8 | uint16(payload[5])
@@ -53,8 +50,8 @@ func (p *Packet) ParsePAT() (*PATTable, error) {
 	// fmt.Println()
 
 	// SectionLength - 5 - 4
-	header, _ := p.GetHeader()
-	fmt.Printf("%#v\r\n", header)
+	// header, _ := p.GetHeader()
+	// fmt.Printf("%#v\r\n", header)
 	pat.Programs = make([]PATProgram, (pat.SectionLength-5-4)/4)
 	for i := uint16(0); i < (pat.SectionLength-5-4)/4; i++ {
 		base := 9 + i*4
@@ -69,16 +66,39 @@ func (p *Packet) ParsePAT() (*PATTable, error) {
 	fmt.Printf("%02x %02x %02x %02x\r\n", uint(payload[pat.SectionLength]), uint(payload[pat.SectionLength+1]), uint(payload[pat.SectionLength+2]), uint(payload[pat.SectionLength+3]))
 	pat.CRC32 = uint(payload[pat.SectionLength])<<24 | uint(payload[pat.SectionLength+1])<<16 | uint(payload[pat.SectionLength+2])<<8 | uint(payload[pat.SectionLength+3])
 	fmt.Printf("%#v\r\n", payload[1:pat.SectionLength])
-	// crc32q := crc32.MakeTable(0x82608EDB)
-	poly := crc.CRC32
-	poly.Polynomial = 0x04C11DB7
-	poly.ReflectIn = false
-	poly.ReflectOut = false
-	poly.FinalXor = 0x00000000
-	checksum := crc.CalculateCRC(crc.CRC32, payload[1:pat.SectionLength])
-	if uint64(pat.CRC32) != checksum {
-		return &pat, errors.New("checksum mismatch")
+
+	crc := CalculateCRC(0, payload[1:pat.SectionLength]) ^ 0xffffffff
+	if uint32(pat.CRC32) != crc {
+		return nil, fmt.Errorf("CRC32 mismatch")
 	}
+
 	fmt.Println("CRC OK")
 	return &pat, nil
+}
+
+// based on isal's crc32 algo found at:
+// https://github.com/01org/isa-l/blob/master/crc/crc_base.c#L138-L155
+func CalculateCRC(seed uint32, data []byte) (crc uint32) {
+	rem := uint64(^seed)
+
+	var i, j int
+
+	const (
+		// defined in
+		// https://github.com/01org/isa-l/blob/master/crc/crc_base.c#L33
+		MAX_ITER = 8
+	)
+
+	for i = 0; i < len(data); i++ {
+		rem = rem ^ (uint64(data[i]) << 24)
+		for j = 0; j < MAX_ITER; j++ {
+			rem = rem << 1
+			if (rem & 0x100000000) != 0 {
+				rem ^= uint64(0x04C11DB7)
+			}
+		}
+	}
+
+	crc = uint32(^rem)
+	return
 }

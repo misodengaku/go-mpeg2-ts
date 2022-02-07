@@ -9,7 +9,8 @@ import (
 const BUFSIZE = 188
 
 func main() {
-	mpeg2, err := mpeg2ts.LoadStandardTS("d443e813-631c-42b5-a25c-6b40558e4477_2022-02-02_055000.h264_gpac.ts")
+	mpeg2, err := mpeg2ts.LoadStandardTS("test.ts")
+	// mpeg2, err := mpeg2ts.LoadStandardTS("d443e813-631c-42b5-a25c-6b40558e4477_2022-02-02_055000.h264_gpac.ts")
 	if err != nil {
 		panic(err)
 	}
@@ -57,16 +58,18 @@ func main() {
 	}
 
 	// go func() {
-	// 	pat := mpeg2.PIDFilter(mpeg2ts.PID_PAT)
-	// 	for _, p := range pat.Packets {
-	// 		// fmt.Println("PAT frame:", p.Index, p.PID, p.Data)
-	// 		patx, _ := p.ParsePAT()
-	// 		fmt.Printf("%#v\r\n", patx)
-	// 	}
+	pat := mpeg2.FilterByPIDs(mpeg2ts.PID_PAT)
+	for _, p := range pat.Packets {
+		// fmt.Println("PAT frame:", p.Index, p.PID, p.Data)
+		patx, _ := p.ParsePAT()
+		fmt.Printf("%#v\r\n", patx)
+		// break
+	}
 	// }()
 	// var ch chan struct{}
 	// go func() {
-	pmt := mpeg2.PIDFilter(mpeg2ts.PID_EIT)
+
+	pmt := mpeg2.FilterByPIDs(mpeg2ts.PID_EIT)
 	for _, p := range pmt.Packets {
 		fmt.Printf("%#v\r\n", p)
 	}

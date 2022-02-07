@@ -130,12 +130,12 @@ func (m MPEG2TS) CheckStream() StreamCheckResult {
 	return cr
 }
 
-func (m MPEG2TS) PIDFilter(pid ...uint16) *MPEG2TS {
+func (m MPEG2TS) FilterByPIDs(pids ...uint16) *MPEG2TS {
 	mx := New()
 	for _, p := range m.Packets {
-		for _, id := range pid {
+		for _, id := range pids {
 			if p.PID == id {
-				fmt.Println(p.Index)
+				// fmt.Println(p.Index)
 				// fmt.Printf("%#v\r\n", p.Data)
 				mx.Packets = append(mx.Packets, p)
 				break
