@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"./mpeg2ts"
+	mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
 )
 
 const BUFSIZE = 188
@@ -13,7 +13,7 @@ const BUFSIZE = 188
 func main() {
 	file, err := os.Open("test.ts")
 	if err != nil {
-		// Openエラー処理
+		panic(err)
 	}
 	defer file.Close()
 	var fsize int64
