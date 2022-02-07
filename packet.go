@@ -1,6 +1,8 @@
 package mpeg2ts
 
-import "errors"
+import (
+	"fmt"
+)
 
 const (
 	ScrambleControl_NotScrambled = 0
@@ -9,49 +11,66 @@ const (
 	ScrambleControl_Userdefined3 = 3
 
 	AdaptationField_Reserved                = 0
-	AdaptationField_Payloadonly             = 1
+	AdaptationField_PayloadOnly             = 1
 	AdaptationField_AdaptationFieldOnly     = 2
 	AdaptationField_AdaptationFieldFollowed = 3
 )
 
-func (p *Mpeg2TSPacket) Load(data []byte, index int) error {
-	if len(data) != 188 {
-		return errors.New("size mismatch")
+func (ps *Packets) AddPacket(packetBytes []byte, packetSize int) error {
+	if len(packetBytes) != packetSize {
+		return fmt.Errorf("packetBytes length and packetSize is not match. len(packetBytes) is %d", len(packetBytes))
 	}
-
+	index := len(*ps)
+	p := Packet{}
+	p.Data = make([]byte, PacketSizeDefault)
+	copy(p.Data, packetBytes)
 	p.Index = index
-	p.Data = make([]byte, 188)
-	copy(p.Data, data)
-	// p.Data = *(&data)
+	// fmt.Printf("index: %d\n", index)
+	err := p.parseHeader()
+	if err != nil {
+		return err
+	}
+	*ps = append(*ps, p)
+	if index == 0 {
+
+		fmt.Printf("%#v\n", p)
+		fmt.Printf("%#v\n", *ps)
+		fmt.Println("---------------------------------")
+	}
 	return nil
 }
 
-func (p *Mpeg2TSPacket) GetHeader() []byte {
+func (p *Packet) GetHeader() ([]byte, error) {
 	if p.Data == nil || len(p.Data) != 188 {
-		return nil
+		return nil, fmt.Errorf("invalid header")
 	}
-	return p.Data[:4]
+	return p.Data[:4], nil
 }
 
-func (p *Mpeg2TSPacket) GetPayload() []byte {
-	if len(p.Data) != 188 {
+func (p *Packet) GetPayload() []byte {
+	if len(p.Data) != PacketSizeDefault {
 		return nil
 	}
 	return p.Data[4:]
 }
 
-func (p *Mpeg2TSPacket) hasAdaptationField() bool {
-	if p.AdaptationFieldControl == AdaptationField_AdaptationFieldOnly || p.AdaptationFieldControl == AdaptationField_AdaptationFieldFollowed {
+func (p *Packet) HasAdaptationField() bool {
+	c := p.AdaptationFieldControl
+	if c == AdaptationField_AdaptationFieldOnly || c == AdaptationField_AdaptationFieldFollowed {
 		return true
 	}
 	return false
 }
 
-func (p *Mpeg2TSPacket) ParseHeader() error {
-	data := p.GetHeader()
+func (p *Packet) parseHeader() error {
+	data, err := p.GetHeader()
+	if err != nil {
+		return fmt.Errorf("not loaded")
+
+	}
 	payload := p.GetPayload()
 	if data == nil {
-		return errors.New("not loaded")
+		return fmt.Errorf("not loaded")
 	}
 
 	p.SyncByte = data[0]
@@ -64,7 +83,7 @@ func (p *Mpeg2TSPacket) ParseHeader() error {
 	p.ContinuityCheckIndex = (data[3] & 0x0F)
 
 	// adaptation field
-	if p.hasAdaptationField() {
+	if p.HasAdaptationField() {
 		af := AdaptationField{}
 		af.Size = payload[0] + 1 // サイズ書いてある分
 		af.DiscontinuityIndicator = ((payload[1] >> 7) & 0x01) == 1
@@ -76,11 +95,11 @@ func (p *Mpeg2TSPacket) ParseHeader() error {
 		af.TransportPrivateDataFlag = ((payload[1] >> 1) & 0x01) == 1
 		af.ExtensionFlag = (payload[1] & 0x01) == 1
 
-		p.AdaptationField = &af
+		p.AdaptationField = af
 	}
 
 	if data[0] != 0x47 {
-		return errors.New("magic number is broken")
+		return fmt.Errorf("invalid magic number")
 	}
 
 	return nil

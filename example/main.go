@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"time"
 
 	mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
 )
@@ -11,83 +9,49 @@ import (
 const BUFSIZE = 188
 
 func main() {
-	file, err := os.Open("test.ts")
+	mpeg2, err := mpeg2ts.LoadStandardTS("d443e813-631c-42b5-a25c-6b40558e4477_2022-02-02_055000.h264_gpac.ts")
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
-	var fsize int64
 
-	if fi, err := file.Stat(); err == nil {
-		fsize = fi.Size()
-	}
-
-	mpeg2 := mpeg2ts.Mpeg2TS{}.New(fsize / 188)
-
-	buf := make([]byte, BUFSIZE)
-	i := 0
-	for {
-		// fmt.Println(i)
-		n, err := file.Read(buf)
-		if err != nil {
-			// Readエラー処理
-			if err.Error() == "EOF" {
-
-			} else {
-				fmt.Println("errbreak")
-				fmt.Println(err)
-			}
-			break
-		}
-		if n == 0 {
-			fmt.Println("0break")
-			time.Sleep(100 * time.Millisecond)
-			break
-		}
-
-		mpeg2.Packets[i].Load(buf, i)
-		mpeg2.Packets[i].ParseHeader()
-		// go func() {
-
-		// }()
-		// go func(index int) {
-		// 	mpeg2.Packets[index].ParseHeader()
-		// }(i)
-
-		i++
-	}
-	for i = 0; i < 100; i++ {
-		//fmt.Printf("%#v\r\n", mpeg2.Packets[i].GetHeader())
-		//fmt.Printf("%#v\r\n", mpeg2.Packets[i].GetPayload())
-		// if mpeg2.Packets[i].ParseHeader() == nil {
-		fmt.Printf("%d %x %t %t %t %d %d %d %d\r\n",
+	for i, p := range mpeg2.Packets {
+		//fmt.Printf("%#v\r\n", p.GetHeader())
+		//fmt.Printf("%#v\r\n", p.GetPayload())
+		// if p.ParseHeader() == nil {
+		fmt.Printf("%d sync:%x tei:%t pusi:%t tpi:%t pid:%x tsc:%d afc:%d cci:%d\r\n",
 			i,
-			mpeg2.Packets[i].SyncByte,
-			mpeg2.Packets[i].TransportErrorIndicator,
-			mpeg2.Packets[i].PayloadUnitStartIndicator,
-			mpeg2.Packets[i].TransportPriorityIndicator,
-			mpeg2.Packets[i].PID,
-			mpeg2.Packets[i].TransportScrambleControl,
-			mpeg2.Packets[i].AdaptationFieldControl,
-			mpeg2.Packets[i].ContinuityCheckIndex)
-		if mpeg2.Packets[i].AdaptationField != nil {
-			fmt.Printf("\tAdaptationField dump: %d %t %t %t %t %t %t %t %t\r\n",
-				mpeg2.Packets[i].AdaptationField.Size,
-				mpeg2.Packets[i].AdaptationField.DiscontinuityIndicator,
-				mpeg2.Packets[i].AdaptationField.RandomAccessIndicator,
-				mpeg2.Packets[i].AdaptationField.ESPriorityIndicator,
-				mpeg2.Packets[i].AdaptationField.PCRFlag,
-				mpeg2.Packets[i].AdaptationField.OPCRFlag,
-				mpeg2.Packets[i].AdaptationField.SplicingPointFlag,
-				mpeg2.Packets[i].AdaptationField.TransportPrivateDataFlag,
-				mpeg2.Packets[i].AdaptationField.ExtensionFlag)
+			p.SyncByte,
+			p.TransportErrorIndicator,
+			p.PayloadUnitStartIndicator,
+			p.TransportPriorityIndicator,
+			p.PID,
+			p.TransportScrambleControl,
+			p.AdaptationFieldControl,
+			p.ContinuityCheckIndex)
+		if p.HasAdaptationField() {
+			fmt.Printf("\tAdaptationField dump: size:%d di:%t rai:%t espi:%t pcr:%t opcr:%t spf:%t tpdf:%t ef:%t\r\n",
+				p.AdaptationField.Size,
+				p.AdaptationField.DiscontinuityIndicator,
+				p.AdaptationField.RandomAccessIndicator,
+				p.AdaptationField.ESPriorityIndicator,
+				p.AdaptationField.PCRFlag,
+				p.AdaptationField.OPCRFlag,
+				p.AdaptationField.SplicingPointFlag,
+				p.AdaptationField.TransportPrivateDataFlag,
+				p.AdaptationField.ExtensionFlag)
 		}
 		// }
+		if i == 100 {
+			break
+		}
 
 	}
 	fmt.Println("Continuity check")
-	if err := mpeg2.CheckStream(); err != nil {
-		fmt.Println(err.Error())
+	if cr := mpeg2.CheckStream(); cr.DropCount > 0 {
+		fmt.Println("frame drop detected!!")
+		for _, v := range cr.DropList {
+			fmt.Printf("frame index: %d\n", v.Index)
+		}
 	} else {
 		fmt.Println("OK")
 	}

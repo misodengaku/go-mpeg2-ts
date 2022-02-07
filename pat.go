@@ -30,7 +30,7 @@ type PATProgram struct {
 	ProgramMapPID uint16
 }
 
-func (p *Mpeg2TSPacket) ParsePAT() (*PATTable, error) {
+func (p *Packet) ParsePAT() (*PATTable, error) {
 	pat := PATTable{}
 	payload := p.GetPayload()
 	pat.Pointer = payload[0]
@@ -53,7 +53,8 @@ func (p *Mpeg2TSPacket) ParsePAT() (*PATTable, error) {
 	// fmt.Println()
 
 	// SectionLength - 5 - 4
-	fmt.Printf("%#v\r\n", p.GetHeader())
+	header, _ := p.GetHeader()
+	fmt.Printf("%#v\r\n", header)
 	pat.Programs = make([]PATProgram, (pat.SectionLength-5-4)/4)
 	for i := uint16(0); i < (pat.SectionLength-5-4)/4; i++ {
 		base := 9 + i*4
