@@ -6,8 +6,6 @@ import (
 	mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
 )
 
-const BUFSIZE = 188
-
 func main() {
 	mpeg2, err := mpeg2ts.LoadStandardTS("test.ts")
 	// mpeg2, err := mpeg2ts.LoadStandardTS("d443e813-631c-42b5-a25c-6b40558e4477_2022-02-02_055000.h264_gpac.ts")
@@ -58,22 +56,61 @@ func main() {
 	}
 
 	// go func() {
-	pat := mpeg2.FilterByPIDs(mpeg2ts.PID_PAT)
-	for _, p := range pat.Packets {
+	var elementaryPID uint16
+	patAll := mpeg2.FilterByPIDs(mpeg2ts.PID_PAT)
+	for _, p := range patAll.Packets {
 		// fmt.Println("PAT frame:", p.Index, p.PID, p.Data)
-		patx, _ := p.ParsePAT()
-		fmt.Printf("%#v\r\n", patx)
+		patTable, _ := p.ParsePAT()
+		fmt.Printf("%#v\r\n", patTable)
+
+		for _, program := range patTable.Programs {
+			// fmt.Printf("Program Table: %#v\n", program)
+			if program.ProgramNumber != 0 {
+				programTable := mpeg2.FilterByPIDs(program.ProgramMapPID)
+				fmt.Printf("Program Table: %#v\n", programTable)
+				for _, pmtPacket := range programTable.Packets {
+					pmt, _ := pmtPacket.ParsePMT()
+					fmt.Printf("parsed %#v\n", pmt)
+					if len(pmt.Streams) > 0 {
+						for _, s := range pmt.Streams {
+							if s.Type == mpeg2ts.StreamTypeAVC {
+								elementaryPID = s.ElementaryPID
+								break
+							}
+						}
+					}
+				}
+			}
+
+		}
 		// break
 	}
-	// }()
-	// var ch chan struct{}
-	// go func() {
 
-	pmt := mpeg2.FilterByPIDs(mpeg2ts.PID_EIT)
-	for _, p := range pmt.Packets {
+	fmt.Printf("Video Stream PID is 0x%04X\n", elementaryPID)
+	ES := mpeg2.FilterByPIDs(elementaryPID)
+	pesParser := mpeg2ts.NewPESParser()
+	for _, p := range ES.Packets {
 		fmt.Printf("%#v\r\n", p)
+		pesParser.EnqueueTSPacket(p)
+		break
 	}
+	fmt.Printf("%#v\r\n", pesParser)
+
+	// pmt := mpeg2.FilterByPIDs(mpeg2ts.PID_EIT)
+	// for _, p := range pmt.Packets {
+	// 	fmt.Printf("%#v\r\n", p)
+	// }
 	// 	ch <- struct{}{}
 	// }()
 	// <-ch
+
+	// for streaming
+	// WaitForPAT()
+	// ParsePAT()
+	// WaitForPMT
+	// ParsePMT
+	// ProgramNum X is video streaming. start forwarding
+	// while(1)
+	// if PID==X: forwarding()
+	// elif PID==PAT: ParsePAT
 }

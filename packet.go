@@ -41,17 +41,22 @@ func (ps *Packets) AddPacket(packetBytes []byte, packetSize int) error {
 }
 
 func (p *Packet) GetHeader() ([]byte, error) {
-	if p.Data == nil || len(p.Data) != 188 {
+	if p.Data == nil || len(p.Data) != PacketSizeDefault {
 		return nil, fmt.Errorf("invalid header")
 	}
 	return p.Data[:4], nil
 }
 
-func (p *Packet) GetPayload() []byte {
-	if len(p.Data) != PacketSizeDefault {
-		return nil
+func (p *Packet) GetPayload() ([]byte, error) {
+	if !p.isHeaderParsed {
+		return nil, fmt.Errorf("execute parseHeader() first")
 	}
-	return p.Data[4:]
+
+	if len(p.Data) != PacketSizeDefault {
+		return nil, fmt.Errorf("invalid data size")
+	}
+
+	return p.Data[4+p.AdaptationField.Size:], nil
 }
 
 func (p *Packet) HasAdaptationField() bool {
@@ -63,44 +68,38 @@ func (p *Packet) HasAdaptationField() bool {
 }
 
 func (p *Packet) parseHeader() error {
-	data, err := p.GetHeader()
-	if err != nil {
-		return fmt.Errorf("not loaded")
-
-	}
-	payload := p.GetPayload()
-	if data == nil {
-		return fmt.Errorf("not loaded")
+	if p.Data[0] != 0x47 {
+		return fmt.Errorf("invalid magic number")
 	}
 
-	p.SyncByte = data[0]
-	p.TransportErrorIndicator = ((data[1] >> 7) & 0x01) == 1
-	p.PayloadUnitStartIndicator = ((data[1] >> 6) & 0x01) == 1
-	p.TransportPriorityIndicator = ((data[1] >> 5) & 0x01) == 1
-	p.PID = (uint16(data[1])&0x1F)<<8 | uint16(data[2])
-	p.TransportScrambleControl = (data[3] >> 6) & 0x03
-	p.AdaptationFieldControl = (data[3] >> 4) & 0x03
-	p.ContinuityCheckIndex = (data[3] & 0x0F)
+	p.SyncByte = p.Data[0]
+	p.TransportErrorIndicator = ((p.Data[1] >> 7) & 0x01) == 1
+	p.PayloadUnitStartIndicator = ((p.Data[1] >> 6) & 0x01) == 1
+	p.TransportPriorityIndicator = ((p.Data[1] >> 5) & 0x01) == 1
+	p.PID = (uint16(p.Data[1])&0x1F)<<8 | uint16(p.Data[2])
+	p.TransportScrambleControl = (p.Data[3] >> 6) & 0x03
+	p.AdaptationFieldControl = (p.Data[3] >> 4) & 0x03
+	p.ContinuityCheckIndex = (p.Data[3] & 0x0F)
 
 	// adaptation field
 	if p.HasAdaptationField() {
 		af := AdaptationField{}
-		af.Size = payload[0] + 1 // サイズ書いてある分
-		af.DiscontinuityIndicator = ((payload[1] >> 7) & 0x01) == 1
-		af.RandomAccessIndicator = ((payload[1] >> 6) & 0x01) == 1
-		af.ESPriorityIndicator = ((payload[1] >> 5) & 0x01) == 1
-		af.PCRFlag = ((payload[1] >> 4) & 0x01) == 1
-		af.OPCRFlag = ((payload[1] >> 3) & 0x01) == 1
-		af.SplicingPointFlag = ((payload[1] >> 2) & 0x01) == 1
-		af.TransportPrivateDataFlag = ((payload[1] >> 1) & 0x01) == 1
-		af.ExtensionFlag = (payload[1] & 0x01) == 1
+		af.Size = p.Data[4] + 1 // サイズ書いてある分
+		af.DiscontinuityIndicator = ((p.Data[4] >> 7) & 0x01) == 1
+		af.RandomAccessIndicator = ((p.Data[4] >> 6) & 0x01) == 1
+		af.ESPriorityIndicator = ((p.Data[4] >> 5) & 0x01) == 1
+		af.PCRFlag = ((p.Data[4] >> 4) & 0x01) == 1
+		af.OPCRFlag = ((p.Data[4] >> 3) & 0x01) == 1
+		af.SplicingPointFlag = ((p.Data[4] >> 2) & 0x01) == 1
+		af.TransportPrivateDataFlag = ((p.Data[4] >> 1) & 0x01) == 1
+		af.ExtensionFlag = (p.Data[4] & 0x01) == 1
+
+		// if PCR_FLAG == '1'
 
 		p.AdaptationField = af
 	}
 
-	if data[0] != 0x47 {
-		return fmt.Errorf("invalid magic number")
-	}
+	p.isHeaderParsed = true
 
 	return nil
 }

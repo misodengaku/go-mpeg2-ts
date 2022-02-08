@@ -10,6 +10,7 @@ type MPEG2TS struct {
 
 type Packets []Packet
 
+// MPEG2-TS Packet
 type Packet struct {
 	Index                      int
 	Data                       []byte
@@ -22,6 +23,8 @@ type Packet struct {
 	TransportPriorityIndicator bool
 	ContinuityCheckIndex       byte
 	AdaptationField            AdaptationField
+
+	isHeaderParsed bool
 }
 
 type AdaptationField struct {
