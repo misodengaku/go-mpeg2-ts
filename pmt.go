@@ -152,8 +152,7 @@ func (p *Packet) ParsePMT() (PMT, error) {
 	index += diff
 
 	// Stream Descriptor
-	// fmt.Println("Stream Descriptor")
-	for {
+	for index < int(pmt.SectionLength) {
 		si := StreamInfo{}
 		si.Type = payload[index]                                                       // 8
 		si.Reserved1 = (payload[index+1] >> 5) & 0x07                                  // 3
@@ -165,10 +164,9 @@ func (p *Packet) ParsePMT() (PMT, error) {
 		si.Descriptors, diff = readDescriptor(payload, index, int(si.ESInfoLength))
 		pmt.Streams = append(pmt.Streams, si)
 		index += diff
-		break // FIXME
 	}
 	pmt.CRC32 = uint(payload[index])<<24 | uint(payload[index+1])<<16 | uint(payload[index+2])<<8 | uint(payload[index+3])
-	// fmt.Printf("crc: %08x\n", pmt.CRC32)
+	fmt.Printf("crc: %08x\n", pmt.CRC32)
 
 	crc := CalculateCRC(0, payload[1:pmt.SectionLength]) ^ 0xffffffff
 	if uint32(pmt.CRC32) != crc {

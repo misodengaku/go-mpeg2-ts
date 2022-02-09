@@ -1,14 +1,19 @@
 package mpeg2ts
 
+import "sync"
+
 const PacketSizeDefault = 188
 const PacketSizeWithFEC = 204
 
 type MPEG2TS struct {
-	Packets  Packets
+	PacketList
 	IsUseFEC bool
 }
 
-type Packets []Packet
+type PacketList struct {
+	packets []Packet
+	mutex   *sync.Mutex
+}
 
 // MPEG2-TS Packet
 type Packet struct {

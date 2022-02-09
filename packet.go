@@ -2,6 +2,7 @@ package mpeg2ts
 
 import (
 	"fmt"
+	"sync"
 )
 
 const (
@@ -16,11 +17,45 @@ const (
 	AdaptationField_AdaptationFieldFollowed = 3
 )
 
-func (ps *Packets) AddPacket(packetBytes []byte, packetSize int) error {
+func NewPacketList() (PacketList, error) {
+	pl := PacketList{}
+	pl.mutex = &sync.Mutex{}
+	return pl, nil
+}
+
+func (ps *PacketList) DequeuePacket() (Packet, error) {
+	ps.mutex.Lock()
+	defer ps.mutex.Unlock()
+	if len(ps.packets) == 0 {
+		return Packet{}, fmt.Errorf("PacketList is empty")
+	}
+	packet := (ps.packets)[0]
+	ps.packets = (ps.packets)[1:]
+	return packet, nil
+}
+
+func (ps *PacketList) All() []Packet {
+	ps.mutex.Lock()
+	defer ps.mutex.Unlock()
+	p := make([]Packet, len(ps.packets))
+	copy(p, ps.packets)
+	return p
+}
+func (ps *PacketList) AddPacket(p Packet) {
+	ps.mutex.Lock()
+	defer ps.mutex.Unlock()
+	ps.packets = append(ps.packets, p)
+	return
+}
+
+func (ps *PacketList) AddBytes(packetBytes []byte, packetSize int) error {
+	ps.mutex.Lock()
+	defer ps.mutex.Unlock()
+
 	if len(packetBytes) != packetSize {
 		return fmt.Errorf("packetBytes length and packetSize is not match. len(packetBytes) is %d", len(packetBytes))
 	}
-	index := len(*ps)
+	index := len(ps.packets)
 	p := Packet{}
 	p.Data = make([]byte, PacketSizeDefault)
 	copy(p.Data, packetBytes)
@@ -30,13 +65,13 @@ func (ps *Packets) AddPacket(packetBytes []byte, packetSize int) error {
 	if err != nil {
 		return err
 	}
-	*ps = append(*ps, p)
-	if index == 0 {
+	ps.packets = append(ps.packets, p)
+	// if index == 0 {
 
-		fmt.Printf("%#v\n", p)
-		fmt.Printf("%#v\n", *ps)
-		fmt.Println("---------------------------------")
-	}
+	// 	fmt.Printf("%#v\n", p)
+	// 	fmt.Printf("%#v\n", *ps)
+	// 	fmt.Println("---------------------------------")
+	// }
 	return nil
 }
 
@@ -69,7 +104,7 @@ func (p *Packet) HasAdaptationField() bool {
 
 func (p *Packet) parseHeader() error {
 	if p.Data[0] != 0x47 {
-		return fmt.Errorf("invalid magic number")
+		return fmt.Errorf("invalid magic number %02X", p.Data[0])
 	}
 
 	p.SyncByte = p.Data[0]

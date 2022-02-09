@@ -7,14 +7,14 @@ import (
 
 func New() *MPEG2TS {
 	m := MPEG2TS{}
-	m.Packets = make(Packets, 0)
+	m.PacketList, _ = NewPacketList()
 	return &m
 }
 
 func NewWithPacketCount(packetCount int64) *MPEG2TS {
-	m := MPEG2TS{}
-	m.Packets = make(Packets, 0, packetCount)
-	return &m
+	m := New()
+	m.PacketList.packets = make([]Packet, 0, packetCount)
+	return m
 }
 
 func LoadStandardTS(fname string) (*MPEG2TS, error) {
@@ -51,28 +51,20 @@ func loadFile(fname string, packetLength int) (*MPEG2TS, error) {
 		n, err := file.Read(packetBuffer)
 		if err != nil {
 			// Readエラー処理
-			if err.Error() != "EOF" {
-				return nil, err
+			if err.Error() == "EOF" {
+				break
 			}
+			return nil, err
 
-			return m, nil
 		}
 		if n < packetLength {
 			return nil, fmt.Errorf("sirikire %d", n)
 		}
 
-		err = m.Packets.AddPacket(packetBuffer, packetLength)
+		err = m.PacketList.AddBytes(packetBuffer, packetLength)
 		if err != nil {
 			return nil, err
 		}
-
-		// mpeg2.Packets[i].ParseHeader()
-		// go func() {
-
-		// }()
-		// go func(index int) {
-		// 	mpeg2.Packets[index].ParseHeader()
-		// }(i)
 
 		i++
 	}
@@ -88,7 +80,7 @@ func (m MPEG2TS) CheckStream() StreamCheckResult {
 		ci[i] = byte(16)
 	}
 
-	for i, p := range m.Packets {
+	for i, p := range m.PacketList.All() {
 		if p.PID == PID_NullPacket {
 			continue
 		}
@@ -130,14 +122,14 @@ func (m MPEG2TS) CheckStream() StreamCheckResult {
 	return cr
 }
 
-func (m MPEG2TS) FilterByPIDs(pids ...uint16) *MPEG2TS {
+func (m *MPEG2TS) FilterByPIDs(pids ...uint16) *MPEG2TS {
 	mx := New()
-	for _, p := range m.Packets {
+	for _, p := range m.PacketList.All() {
 		for _, id := range pids {
 			if p.PID == id {
 				// fmt.Println(p.Index)
 				// fmt.Printf("%#v\r\n", p.Data)
-				mx.Packets = append(mx.Packets, p)
+				mx.AddPacket(p)
 				break
 			}
 		}

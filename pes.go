@@ -1,7 +1,5 @@
 package mpeg2ts
 
-import "fmt"
-
 const (
 	// Rec. ITU-T H.222.0 (06/2021) pp.42-43
 	StreamID_ProgramStreamMap       = 0xbc
@@ -89,7 +87,7 @@ func (pp *PESParser) EnqueueTSPacket(tsPacket Packet) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("eq: %#v\n", payload)
+	// fmt.Printf("eq: %#v\n", payload)
 	if pp.packetCount == 0 {
 		pp.PES.Prefix = uint32(payload[0])<<16 | uint32(payload[1])<<8 | uint32(payload[2])
 		pp.PES.StreamID = payload[3]
