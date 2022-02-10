@@ -33,7 +33,7 @@ type Packet struct {
 }
 
 type AdaptationField struct {
-	Size                          byte
+	Length                        byte
 	DiscontinuityIndicator        bool
 	RandomAccessIndicator         bool
 	ESPriorityIndicator           bool

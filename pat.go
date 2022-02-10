@@ -47,18 +47,12 @@ func (p *Packet) ParsePAT() (PAT, error) {
 	pat.SectionNumber = payload[7]
 	pat.LastSectionNumber = payload[8]
 
-	// fmt.Printf("pat %d dump %x %x %t %d \r\n", p.Index, pat.Pointer, pat.TableID, pat.SectionSyntaxIndicator, pat.SectionLength)
-	// for i := 0; i < 188; i++ {
-	// 	fmt.Printf("%02x ", p.Data[i])
-	// }
-	// fmt.Println()
+	fmt.Printf("PAT: %#v\r\n", pat)
 
-	// SectionLength - 5 - 4
-	// header, _ := p.GetHeader()
-	// fmt.Printf("%#v\r\n", header)
 	pat.Programs = make([]PATProgram, (pat.SectionLength-5-4)/4)
 	for i := uint16(0); i < (pat.SectionLength-5-4)/4; i++ {
 		base := 9 + i*4
+		// fmt.Println("base", base, len(payload))
 		pat.Programs[i].ProgramNumber = uint16(payload[base])<<8 | uint16(payload[base+1])
 		if pat.Programs[i].ProgramNumber == 0x0000 {
 			pat.Programs[i].NetworkPID = uint16(payload[base+2]&0x1f)<<8 | uint16(payload[base+3])&0x1fff

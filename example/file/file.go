@@ -128,7 +128,7 @@ func dumpPackets(count int) {
 			p.ContinuityCheckIndex)
 		if p.HasAdaptationField() {
 			fmt.Printf("\tAdaptationField dump: size:%d di:%t rai:%t espi:%t pcr:%t opcr:%t spf:%t tpdf:%t ef:%t\r\n",
-				p.AdaptationField.Size,
+				p.AdaptationField.Length,
 				p.AdaptationField.DiscontinuityIndicator,
 				p.AdaptationField.RandomAccessIndicator,
 				p.AdaptationField.ESPriorityIndicator,

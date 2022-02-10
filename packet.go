@@ -91,7 +91,11 @@ func (p *Packet) GetPayload() ([]byte, error) {
 		return nil, fmt.Errorf("invalid data size")
 	}
 
-	return p.Data[4+p.AdaptationField.Size:], nil
+	// fmt.Printf("payload: %#v\n", p.Data[4+p.AdaptationField.Size+1:])
+	if p.AdaptationField.Length > 0 {
+		return p.Data[4+p.AdaptationField.Length+1:], nil
+	}
+	return p.Data[4:], nil
 }
 
 func (p *Packet) HasAdaptationField() bool {
@@ -119,7 +123,7 @@ func (p *Packet) parseHeader() error {
 	// adaptation field
 	if p.HasAdaptationField() {
 		af := AdaptationField{}
-		af.Size = p.Data[4]
+		af.Length = p.Data[4]
 		af.DiscontinuityIndicator = ((p.Data[5] >> 7) & 0x01) == 1
 		af.RandomAccessIndicator = ((p.Data[5] >> 6) & 0x01) == 1
 		af.ESPriorityIndicator = ((p.Data[5] >> 5) & 0x01) == 1
@@ -194,8 +198,8 @@ func (p *Packet) parseHeader() error {
 		}
 
 		// TODO: nokori
-		if fieldIndex-5 < int(af.Size) {
-			af.Stuffing = p.Data[fieldIndex : int(af.Size)+fieldIndex-1]
+		if fieldIndex-5 < int(af.Length) {
+			af.Stuffing = p.Data[fieldIndex : int(af.Length)+fieldIndex-1]
 			// fmt.Printf("stuffing(%d): %#v\n", len(af.Stuffing), af.Stuffing)
 			for i, v := range af.Stuffing {
 				if v != 0xff {

@@ -257,6 +257,9 @@ func (pp *PESParser) EnqueueTSPacket(tsPacket Packet, eop bool) error {
 	if err != nil {
 		return err
 	}
+	if eop {
+		fmt.Printf("byteBuffer: %#v\n", byteBuffer)
+	}
 	_, err = pp.WriteBytes(byteBuffer, eop)
 	return err
 }
