@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
 )
@@ -10,7 +11,7 @@ var mpeg2 *mpeg2ts.MPEG2TS
 
 func main() {
 	var err error
-	mpeg2, err = mpeg2ts.LoadStandardTS("cam.ts")
+	mpeg2, err = mpeg2ts.LoadStandardTS("test.ts")
 	// mpeg2, err := mpeg2ts.LoadStandardTS("d443e813-631c-42b5-a25c-6b40558e4477_2022-02-02_055000.h264_gpac.ts")
 	if err != nil {
 		panic(err)
@@ -51,15 +52,33 @@ func main() {
 		// break
 	}
 
-	fmt.Printf("Video Stream PID is 0x%04X\n", elementaryPID)
+	fmt.Printf("Video Stream PID is 0x%04X. start PES dump\n", elementaryPID)
 	ES := mpeg2.FilterByPIDs(elementaryPID)
 	pesParser := mpeg2ts.NewPESParser()
+	pesChan := pesParser.StartPESReadLoop()
+	go func() {
+		i := 0
+		for {
+			p := <-pesChan
+			fmt.Printf("PES frame: %dbytes\n", len(p.ElementaryStream))
+			fname := fmt.Sprintf("es_%04d.bin", i)
+			os.WriteFile(fname, p.ElementaryStream, 0644)
+			i++
+		}
+	}()
 	for _, p := range ES.PacketList.All() {
-		fmt.Printf("%#v\r\n", p)
-		pesParser.EnqueueTSPacket(p)
-		break
+		// fmt.Printf("%#v\r\n", p)
+		eop := false
+		if len(p.AdaptationField.Stuffing) > 0 {
+			eop = true
+		}
+		err = pesParser.EnqueueTSPacket(p, eop)
+		if err != nil {
+			panic(err)
+		}
+		// break
 	}
-	fmt.Printf("%#v\r\n", pesParser)
+	// fmt.Printf("%#v\r\n", pesParser)
 
 	checkContinuity()
 

@@ -33,15 +33,23 @@ type Packet struct {
 }
 
 type AdaptationField struct {
-	Size                     byte
-	DiscontinuityIndicator   bool
-	RandomAccessIndicator    bool
-	ESPriorityIndicator      bool
-	PCRFlag                  bool
-	OPCRFlag                 bool
-	SplicingPointFlag        bool
-	TransportPrivateDataFlag bool
-	ExtensionFlag            bool
+	Size                          byte
+	DiscontinuityIndicator        bool
+	RandomAccessIndicator         bool
+	ESPriorityIndicator           bool
+	PCRFlag                       bool
+	OPCRFlag                      bool
+	SplicingPointFlag             bool
+	TransportPrivateDataFlag      bool
+	ExtensionFlag                 bool
+	ProgramClockReference         ProgramClockReference
+	OriginalProgramClockReference ProgramClockReference
+	Stuffing                      []byte
+}
+
+type ProgramClockReference struct {
+	Base      uint64
+	Extension uint16
 }
 
 type StreamCheckResult struct {
