@@ -65,7 +65,7 @@ func (p *Packet) ParsePAT() (PAT, error) {
 	pat.CRC32 = uint(payload[pat.SectionLength])<<24 | uint(payload[pat.SectionLength+1])<<16 | uint(payload[pat.SectionLength+2])<<8 | uint(payload[pat.SectionLength+3])
 	// fmt.Printf("%#v\r\n", payload[1:pat.SectionLength])
 
-	crc := CalculateCRC(0, payload[1:pat.SectionLength]) ^ 0xffffffff
+	crc := calculateCRC(payload[1:pat.SectionLength])
 	if uint32(pat.CRC32) != crc {
 		return PAT{}, fmt.Errorf("CRC32 mismatch")
 	}

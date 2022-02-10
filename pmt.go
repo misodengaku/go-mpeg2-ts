@@ -177,7 +177,8 @@ func (p *Packet) ParsePMT() (PMT, error) {
 	pmt.CRC32 = uint(payload[index])<<24 | uint(payload[index+1])<<16 | uint(payload[index+2])<<8 | uint(payload[index+3])
 	// fmt.Printf("crc: %08x\n", pmt.CRC32)
 
-	crc := CalculateCRC(0, payload[1:pmt.SectionLength]) ^ 0xffffffff
+	crc := calculateCRC(payload[1:pmt.SectionLength])
+
 	if uint32(pmt.CRC32) != crc {
 		// fmt.Printf("CRC error\n")
 		return PMT{}, fmt.Errorf("CRC32 mismatch")
