@@ -7,12 +7,13 @@ const PacketSizeWithFEC = 204
 
 type MPEG2TS struct {
 	PacketList
-	IsUseFEC bool
+	chunkSize int
 }
 
 type PacketList struct {
-	packets []Packet
-	mutex   *sync.Mutex
+	packets   []Packet
+	mutex     *sync.Mutex
+	chunkSize int
 }
 
 // MPEG2-TS Packet
@@ -20,7 +21,7 @@ type Packet struct {
 	Index                      int
 	Data                       []byte
 	SyncByte                   byte
-	PID                        uint16 // 中身は13bit
+	PID                        uint16
 	TransportScrambleControl   byte
 	AdaptationFieldControl     byte
 	TransportErrorIndicator    bool

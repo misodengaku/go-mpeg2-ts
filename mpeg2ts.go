@@ -5,14 +5,14 @@ import (
 	"os"
 )
 
-func New() *MPEG2TS {
+func New(chunkSize int) *MPEG2TS {
 	m := MPEG2TS{}
-	m.PacketList, _ = NewPacketList()
+	m.PacketList, _ = NewPacketList(chunkSize)
 	return &m
 }
 
-func NewWithPacketCount(packetCount int64) *MPEG2TS {
-	m := New()
+func NewWithPacketCount(packetCount int64, chunkSize int) *MPEG2TS {
+	m := New(chunkSize)
 	m.PacketList.packets = make([]Packet, 0, packetCount)
 	return m
 }
@@ -42,7 +42,7 @@ func loadFile(fname string, packetLength int) (*MPEG2TS, error) {
 		return nil, fmt.Errorf("filesize (%d) is smaller than the minimum (%d)", fsize, PacketSizeDefault)
 	}
 
-	m := NewWithPacketCount(fsize / int64(packetLength))
+	m := NewWithPacketCount(fsize/int64(packetLength), packetLength)
 
 	packetBuffer := make([]byte, packetLength)
 	i := 0
@@ -123,7 +123,7 @@ func (m MPEG2TS) CheckStream() StreamCheckResult {
 }
 
 func (m *MPEG2TS) FilterByPIDs(pids ...uint16) *MPEG2TS {
-	mx := New()
+	mx := New(m.chunkSize)
 	for _, p := range m.PacketList.All() {
 		for _, id := range pids {
 			if p.PID == id {

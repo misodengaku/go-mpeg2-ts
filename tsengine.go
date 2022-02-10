@@ -6,16 +6,18 @@ import (
 	"time"
 )
 
+const TSEngineBufferSize = 1048576
+
 type TransportStreamEngine struct {
 	buf     []byte
 	packets PacketList
 	mutex   *sync.Mutex
 }
 
-func InitTSEngine() (TransportStreamEngine, error) {
+func InitTSEngine(chunkSize int) (TransportStreamEngine, error) {
 	tse := TransportStreamEngine{}
-	tse.buf = make([]byte, 0, 1048576)
-	tse.packets, _ = NewPacketList()
+	tse.buf = make([]byte, 0, TSEngineBufferSize)
+	tse.packets, _ = NewPacketList(chunkSize)
 	tse.mutex = &sync.Mutex{}
 	return tse, nil
 }

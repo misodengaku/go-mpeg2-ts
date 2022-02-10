@@ -22,7 +22,7 @@ func main() {
 	}
 	udpConn, _ := net.ListenUDP("udp", udpAddr)
 
-	buf := make([]byte, 1024)
+	buf := make([]byte, 1048576)
 	log.Println("Starting udp server...")
 	tse, _ := mpeg2ts.InitTSEngine()
 	tsPacketChan := tse.StartPacketReadLoop()
@@ -77,7 +77,11 @@ func main() {
 			}
 		} else if state == 2 && v.PID == elementaryPID {
 			fmt.Println("PES received")
-			pesParser.EnqueueTSPacket(v)
+			eop := false
+			if len(v.AdaptationField.Stuffing) > 0 {
+				eop = true
+			}
+			pesParser.EnqueueTSPacket(v, eop)
 		}
 
 	}

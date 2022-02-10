@@ -17,9 +17,10 @@ const (
 	AdaptationField_AdaptationFieldFollowed = 3
 )
 
-func NewPacketList() (PacketList, error) {
+func NewPacketList(chunkSize int) (PacketList, error) {
 	pl := PacketList{}
 	pl.mutex = &sync.Mutex{}
+	pl.chunkSize = chunkSize
 	return pl, nil
 }
 
@@ -124,6 +125,16 @@ func (p *Packet) parseHeader() error {
 	if p.HasAdaptationField() {
 		af := AdaptationField{}
 		af.Length = p.Data[4]
+		if p.AdaptationFieldControl == AdaptationField_AdaptationFieldFollowed {
+			if af.Length > 183 {
+				return fmt.Errorf("AdaptationField.Length should not exceed 182bytes")
+			}
+		} else if p.AdaptationFieldControl == AdaptationField_AdaptationFieldOnly {
+			if af.Length != 183 {
+				return fmt.Errorf("AdaptationField.Length must be 182bytes")
+			}
+		}
+
 		af.DiscontinuityIndicator = ((p.Data[5] >> 7) & 0x01) == 1
 		af.RandomAccessIndicator = ((p.Data[5] >> 6) & 0x01) == 1
 		af.ESPriorityIndicator = ((p.Data[5] >> 5) & 0x01) == 1
@@ -132,6 +143,8 @@ func (p *Packet) parseHeader() error {
 		af.SplicingPointFlag = ((p.Data[5] >> 2) & 0x01) == 1
 		af.TransportPrivateDataFlag = ((p.Data[5] >> 1) & 0x01) == 1
 		af.ExtensionFlag = (p.Data[5] & 0x01) == 1
+		// fmt.Printf("af: %#v\n", af)
+		// fmt.Printf("bytes: %#v\n", p.Data)
 
 		fieldIndex := 6
 		if af.PCRFlag {
@@ -145,23 +158,30 @@ func (p *Packet) parseHeader() error {
 		}
 		if af.OPCRFlag {
 			// original_program_clock_reference_base 33 uimsbf
+			af.OriginalProgramClockReference.Base = uint64(p.Data[fieldIndex])<<25 | uint64(p.Data[fieldIndex+1])<<17 | uint64(p.Data[fieldIndex+2])<<9 | uint64(p.Data[fieldIndex+3])<<1 | uint64(p.Data[fieldIndex+4])>>7&0x01
 			// reserved 6 bslbf
 			// original_program_clock_reference_extension 9 uimsbf
-			fmt.Printf("[BUG] OPCR parsing is not implemented")
+			af.OriginalProgramClockReference.Extension = uint16(p.Data[fieldIndex+4]&0x01)<<8 | uint16(p.Data[fieldIndex+5])
+			fieldIndex += 6
+			// fmt.Println("[BUG] OPCR parsing is not implemented")
 		}
 		if af.SplicingPointFlag {
 			// splice_countdown 8 tcimsbf
-			fmt.Printf("[BUG] SplicingPoint parsing is not implemented")
+			fmt.Println("[BUG] SplicingPoint parsing is not implemented")
+
+			fmt.Printf("af: %#v\n", af)
 		}
 		if af.TransportPrivateDataFlag {
 			// transport_private_data_length 8 uimsbf
 			// for (i = 0; i < transport_private_data_length; i++) {
 			// 	private_data_byte 8 bslbf
 			// }
-			fmt.Printf("[BUG] TransportPrivateData parsing is not implemented")
+			fmt.Println("[BUG] TransportPrivateData parsing is not implemented")
+			fmt.Printf("af: %#v\n", af)
 		}
 		if af.ExtensionFlag {
-			fmt.Printf("[BUG] AdaptationFieldExtension parsing is not implemented")
+			fmt.Println("[BUG] AdaptationFieldExtension parsing is not implemented")
+			fmt.Printf("af: %#v\n", af)
 			// adaptation_field_extension_length 8 uimsbf
 			// ltw_flag 1 bslbf
 			// piecewise_rate_flag 1 bslbf
@@ -199,11 +219,14 @@ func (p *Packet) parseHeader() error {
 
 		// TODO: nokori
 		if fieldIndex-5 < int(af.Length) {
-			af.Stuffing = p.Data[fieldIndex : int(af.Length)+fieldIndex-1]
 			// fmt.Printf("stuffing(%d): %#v\n", len(af.Stuffing), af.Stuffing)
+			if int(af.Length)+fieldIndex-1 > len(p.Data) {
+				return fmt.Errorf("[BUG] invalid Length(%d) or fieldIndex(%d)", af.Length, fieldIndex)
+			}
+			af.Stuffing = p.Data[fieldIndex : int(af.Length)+fieldIndex-1]
 			for i, v := range af.Stuffing {
 				if v != 0xff {
-					fmt.Printf("[BUG] stuffing bytes contains non-0xff byte. data:0x%02x index:%d", v, i)
+					return fmt.Errorf("[BUG] stuffing bytes contains non-0xff byte. data:0x%02x index:%d", v, i)
 				}
 			}
 		}
