@@ -101,6 +101,8 @@ type ProgramElementDescriptor struct {
 	Length uint8
 
 	VideoStreamDescriptor
+	RegistrationDescriptor
+	UserPrivateDescriptor
 }
 
 type VideoStreamDescriptor struct {
@@ -115,6 +117,13 @@ type VideoStreamDescriptor struct {
 	ChromaFormat              uint8
 	FrameRateExtensionFlag    bool
 	Reserved                  uint8
+}
+
+type RegistrationDescriptor struct {
+	FormatIdentifier []byte
+}
+type UserPrivateDescriptor struct {
+	Data []byte
 }
 
 func (p *Packet) ParsePMT() (PMT, error) {
@@ -166,7 +175,7 @@ func (p *Packet) ParsePMT() (PMT, error) {
 		index += diff
 	}
 	pmt.CRC32 = uint(payload[index])<<24 | uint(payload[index+1])<<16 | uint(payload[index+2])<<8 | uint(payload[index+3])
-	fmt.Printf("crc: %08x\n", pmt.CRC32)
+	// fmt.Printf("crc: %08x\n", pmt.CRC32)
 
 	crc := CalculateCRC(0, payload[1:pmt.SectionLength]) ^ 0xffffffff
 	if uint32(pmt.CRC32) != crc {
@@ -182,7 +191,11 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 	diff := 0
 	peds := []ProgramElementDescriptor{}
 
-	for index := startIndex; index < (startIndex + length); {
+	// fmt.Printf("piLen:%d\n", length)
+
+	endIndex := startIndex + length
+	for index := startIndex; index < endIndex; {
+		// fmt.Printf("desc index:%d max:%d len:%d\n", index, (startIndex + length), endIndex)
 		ped := ProgramElementDescriptor{}
 		ped.Tag = payload[index]
 		ped.Length = payload[index+1]
@@ -209,6 +222,8 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 		case ped.Tag == 3: //audio_stream_descriptor
 		case ped.Tag == 4: //hierarchy_descriptor
 		case ped.Tag == 5: //registration_descriptor
+			ped.RegistrationDescriptor.FormatIdentifier = payload[index+2 : int(ped.Length)+index+2]
+			diff += int(ped.Length)
 		case ped.Tag == 6: //data_stream_alignment_descriptor
 		case ped.Tag == 7: //target_background_grid_descriptor
 		case ped.Tag == 8: //Video_window_descriptor
@@ -236,9 +251,11 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 		case ped.Tag >= 19 && ped.Tag <= 26: // Defined in ISO/IEC 13818-6
 		case ped.Tag >= 36 && ped.Tag <= 63: // ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Reserved
 		case ped.Tag >= 64 && ped.Tag <= 255: //  User Private
+			ped.UserPrivateDescriptor.Data = payload[index+2 : int(ped.Length)+index+2]
+			diff += int(ped.Length)
 		}
 
-		fmt.Printf("ped dump %#v\r\n", ped)
+		// fmt.Printf("ped dump %#v\r\n", ped)
 		index += diff
 		peds = append(peds, ped)
 	}

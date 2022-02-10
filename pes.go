@@ -252,7 +252,7 @@ func (pp *PESParser) WriteBytes(p []byte, eop bool) (n int, err error) {
 	}
 	pesBytes[inputBytes-1].EndOfPacket = eop
 	pp.buffer = append(pp.buffer, pesBytes...)
-	fmt.Printf("len: %d cap: %d\n", len(pp.buffer), cap(pp.buffer))
+	// fmt.Printf("len: %d cap: %d\n", len(pp.buffer), cap(pp.buffer))
 	return inputBytes, nil
 }
 
@@ -267,79 +267,3 @@ func (pp *PESParser) EnqueueTSPacket(tsPacket Packet, eop bool) error {
 	_, err = pp.WriteBytes(byteBuffer, eop)
 	return err
 }
-
-// func (p *Packet) ParsePES() (PES, error) {
-// 	pes := PES{}
-// 	pp.buffer := p.GetPayload()
-// 	pes.Pointer = pp.buffer[0]
-// 	pes.TableID = pp.buffer[1]
-// 	pes.SectionSyntaxIndicator = ((pp.buffer[2] >> 7) & 0x01) == 1
-// 	if ((pp.buffer[2] >> 6) & 0x01) == 1 {
-// 		return PES{}, fmt.Errorf("invalid format")
-// 	}
-// 	pes.SectionLength = uint16(pp.buffer[2]&0x0F)<<8 | uint16(pp.buffer[3])
-// 	pes.TransportStreamID = uint16(pp.buffer[4])<<8 | uint16(pp.buffer[5])
-// 	pes.Version = (pp.buffer[6] >> 1) & 0x1F
-// 	pes.CurrentNextIndicator = (pp.buffer[6] & 0x01) == 0x01
-// 	pes.SectionNumber = pp.buffer[7]
-// 	pes.LastSectionNumber = pp.buffer[8]
-
-// 	// fmt.Printf("pes %d dump %x %x %t %d \r\n", p.Index, pes.Pointer, pes.TableID, pes.SectionSyntaxIndicator, pes.SectionLength)
-// 	// for i := 0; i < 188; i++ {
-// 	// 	fmt.Printf("%02x ", p.Data[i])
-// 	// }
-// 	// fmt.Println()
-
-// 	// SectionLength - 5 - 4
-// 	// header, _ := p.GetHeader()
-// 	// fmt.Printf("%#v\r\n", header)
-// 	pes.Programs = make([]PESProgram, (pes.SectionLength-5-4)/4)
-// 	for i := uint16(0); i < (pes.SectionLength-5-4)/4; i++ {
-// 		base := 9 + i*4
-// 		pes.Programs[i].ProgramNumber = uint16(pp.buffer[base])<<8 | uint16(pp.buffer[base+1])
-// 		if pes.Programs[i].ProgramNumber == 0x0000 {
-// 			pes.Programs[i].NetworkPID = uint16(pp.buffer[base+2]&0x1f)<<8 | uint16(pp.buffer[base+3])&0x1fff
-// 		} else {
-// 			pes.Programs[i].ProgramMapPID = uint16(pp.buffer[base+2]&0x1f)<<8 | uint16(pp.buffer[base+3])&0x1fff
-// 		}
-// 		// pes.Programs[i].ProgramMapPID = uint16(pp.buffer[base+2]&0x1f)<<8 | uint16(pp.buffer[base+3])
-// 	}
-// 	// fmt.Printf("CRC32 dump: %02x %02x %02x %02x\r\n", uint(pp.buffer[pes.SectionLength]), uint(pp.buffer[pes.SectionLength+1]), uint(pp.buffer[pes.SectionLength+2]), uint(pp.buffer[pes.SectionLength+3]))
-// 	pes.CRC32 = uint(pp.buffer[pes.SectionLength])<<24 | uint(pp.buffer[pes.SectionLength+1])<<16 | uint(pp.buffer[pes.SectionLength+2])<<8 | uint(pp.buffer[pes.SectionLength+3])
-// 	// fmt.Printf("%#v\r\n", pp.buffer[1:pes.SectionLength])
-
-// 	crc := CalculateCRC(0, pp.buffer[1:pes.SectionLength]) ^ 0xffffffff
-// 	if uint32(pes.CRC32) != crc {
-// 		return PES{}, fmt.Errorf("CRC32 mismatch")
-// 	}
-
-// 	// fmt.Println("CRC OK")
-// 	return pes, nil
-// }
-
-// // based on isal's crc32 algo found at:
-// // https://github.com/01org/isa-l/blob/master/crc/crc_base.c#L138-L155
-// func CalculateCRC(seed uint32, data []byte) (crc uint32) {
-// 	rem := uint64(^seed)
-
-// 	var i, j int
-
-// 	const (
-// 		// defined in
-// 		// https://github.com/01org/isa-l/blob/master/crc/crc_base.c#L33
-// 		MAX_ITER = 8
-// 	)
-
-// 	for i = 0; i < len(data); i++ {
-// 		rem = rem ^ (uint64(data[i]) << 24)
-// 		for j = 0; j < MAX_ITER; j++ {
-// 			rem = rem << 1
-// 			if (rem & 0x100000000) != 0 {
-// 				rem ^= uint64(0x04C11DB7)
-// 			}
-// 		}
-// 	}
-
-// 	crc = uint32(^rem)
-// 	return
-// }

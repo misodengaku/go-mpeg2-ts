@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
 )
@@ -11,14 +12,14 @@ var mpeg2 *mpeg2ts.MPEG2TS
 
 func main() {
 	var err error
-	mpeg2, err = mpeg2ts.LoadStandardTS("../files/test.ts")
+	mpeg2, err = mpeg2ts.LoadStandardTS("test.ts")
 	if err != nil {
 		panic(err)
 	}
 
 	var elementaryPID uint16
-	patAll := mpeg2.FilterByPIDs(mpeg2ts.PID_PAT)
-	for _, p := range patAll.PacketList.All() {
+	patPackets := mpeg2.FilterByPIDs(mpeg2ts.PID_PAT)
+	for _, p := range patPackets.PacketList.All() {
 		fmt.Println("PAT frame:", p.Index, p.PID)
 		patTable, _ := p.ParsePAT()
 
@@ -59,7 +60,7 @@ func main() {
 	}
 
 	fmt.Printf("Video Stream PID is 0x%04X. start PES dump\n", elementaryPID)
-	ES := mpeg2.FilterByPIDs(elementaryPID)
+	pesPackets := mpeg2.FilterByPIDs(elementaryPID)
 	pesParser := mpeg2ts.NewPESParser(8 * 1048576)
 	pesChan := pesParser.StartPESReadLoop()
 	go func() {
@@ -68,15 +69,14 @@ func main() {
 			p := <-pesChan
 			go func(index int, pes mpeg2ts.PES) {
 
-				fmt.Printf("PES frame: %dbytes\n", len(p.ElementaryStream))
+				fmt.Printf("ES frame: %dbytes\n", len(p.ElementaryStream))
 				fname := fmt.Sprintf("es_%04d.bin", i)
 				os.WriteFile(fname, p.ElementaryStream, 0644)
 			}(i, p)
 			i++
 		}
 	}()
-	for _, p := range ES.PacketList.All() {
-		// fmt.Printf("%#v\r\n", p)
+	for _, p := range pesPackets.PacketList.All() {
 		eop := false
 		if len(p.AdaptationField.Stuffing) > 0 {
 			eop = true
@@ -87,6 +87,7 @@ func main() {
 		}
 	}
 
+	time.Sleep(400 * time.Millisecond) // (loosely) wait for output ES frame
 	checkContinuity()
 }
 
