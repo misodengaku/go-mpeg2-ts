@@ -24,9 +24,9 @@ func main() {
 
 	buf := make([]byte, 1048576)
 	log.Println("Starting udp server...")
-	tse, _ := mpeg2ts.InitTSEngine()
+	tse, _ := mpeg2ts.InitTSEngine(mpeg2ts.PacketSizeDefault)
 	tsPacketChan := tse.StartPacketReadLoop()
-	pesParser := mpeg2ts.NewPESParser()
+	pesParser := mpeg2ts.NewPESParser(1048576)
 	// pesChan := pesParser.StartPESReadLoop()
 
 	go func() {

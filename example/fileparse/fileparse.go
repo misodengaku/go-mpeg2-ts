@@ -11,13 +11,11 @@ var mpeg2 *mpeg2ts.MPEG2TS
 
 func main() {
 	var err error
-	mpeg2, err = mpeg2ts.LoadStandardTS("test.ts")
-	// mpeg2, err := mpeg2ts.LoadStandardTS("d443e813-631c-42b5-a25c-6b40558e4477_2022-02-02_055000.h264_gpac.ts")
+	mpeg2, err = mpeg2ts.LoadStandardTS("../files/test.ts")
 	if err != nil {
 		panic(err)
 	}
 
-	// go func() {
 	var elementaryPID uint16
 	patAll := mpeg2.FilterByPIDs(mpeg2ts.PID_PAT)
 	for _, p := range patAll.PacketList.All() {
@@ -41,28 +39,39 @@ func main() {
 							fmt.Printf("Stream PID:%02X type:%02X\n", s.ElementaryPID, s.Type)
 							if s.Type == mpeg2ts.StreamTypeAVC {
 								elementaryPID = s.ElementaryPID
-								// break
+								break
 							}
+						}
+						if elementaryPID != 0 {
+							break
 						}
 					}
 				}
 			}
-
+			if elementaryPID != 0 {
+				break
+			}
 		}
-		// break
+
+		if elementaryPID != 0 {
+			break
+		}
 	}
 
 	fmt.Printf("Video Stream PID is 0x%04X. start PES dump\n", elementaryPID)
 	ES := mpeg2.FilterByPIDs(elementaryPID)
-	pesParser := mpeg2ts.NewPESParser()
+	pesParser := mpeg2ts.NewPESParser(8 * 1048576)
 	pesChan := pesParser.StartPESReadLoop()
 	go func() {
 		i := 0
 		for {
 			p := <-pesChan
-			fmt.Printf("PES frame: %dbytes\n", len(p.ElementaryStream))
-			fname := fmt.Sprintf("es_%04d.bin", i)
-			os.WriteFile(fname, p.ElementaryStream, 0644)
+			go func(index int, pes mpeg2ts.PES) {
+
+				fmt.Printf("PES frame: %dbytes\n", len(p.ElementaryStream))
+				fname := fmt.Sprintf("es_%04d.bin", i)
+				os.WriteFile(fname, p.ElementaryStream, 0644)
+			}(i, p)
 			i++
 		}
 	}()
@@ -76,29 +85,9 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		// break
 	}
-	// fmt.Printf("%#v\r\n", pesParser)
 
 	checkContinuity()
-
-	// pmt := mpeg2.FilterByPIDs(mpeg2ts.PID_EIT)
-	// for _, p := range pmt.Packets {
-	// 	fmt.Printf("%#v\r\n", p)
-	// }
-	// 	ch <- struct{}{}
-	// }()
-	// <-ch
-
-	// for streaming
-	// WaitForPAT()
-	// ParsePAT()
-	// WaitForPMT
-	// ParsePMT
-	// ProgramNum X is video streaming. start forwarding
-	// while(1)
-	// if PID==X: forwarding()
-	// elif PID==PAT: ParsePAT
 }
 
 func checkContinuity() {
@@ -114,7 +103,6 @@ func checkContinuity() {
 }
 
 func dumpPackets(count int) {
-
 	for i, p := range mpeg2.PacketList.All() {
 		fmt.Printf("%d sync:%x tei:%t pusi:%t tpi:%t pid:%x tsc:%d afc:%d cci:%d\r\n",
 			i,
@@ -138,7 +126,6 @@ func dumpPackets(count int) {
 				p.AdaptationField.TransportPrivateDataFlag,
 				p.AdaptationField.ExtensionFlag)
 		}
-		// }
 		if count > 0 && count-1 == i {
 			break
 		}
