@@ -45,12 +45,18 @@ type AdaptationField struct {
 	ExtensionFlag                 bool
 	ProgramClockReference         ProgramClockReference
 	OriginalProgramClockReference ProgramClockReference
+	TransportPrivateData          TransportPrivateData
 	Stuffing                      []byte
 }
 
 type ProgramClockReference struct {
 	Base      uint64
 	Extension uint16
+}
+
+type TransportPrivateData struct {
+	Length byte
+	Data   []byte
 }
 
 type StreamCheckResult struct {

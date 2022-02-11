@@ -176,8 +176,9 @@ func (p *Packet) parseHeader() error {
 			// for (i = 0; i < transport_private_data_length; i++) {
 			// 	private_data_byte 8 bslbf
 			// }
-			fmt.Println("[BUG] TransportPrivateData parsing is not implemented")
-			fmt.Printf("af: %#v\n", af)
+			af.TransportPrivateData.Length = p.Data[fieldIndex]
+			af.TransportPrivateData.Data = p.Data[fieldIndex+1 : fieldIndex+1+int(af.TransportPrivateData.Length)]
+			fieldIndex += 1 + int(af.TransportPrivateData.Length)
 		}
 		if af.ExtensionFlag {
 			fmt.Println("[BUG] AdaptationFieldExtension parsing is not implemented")
