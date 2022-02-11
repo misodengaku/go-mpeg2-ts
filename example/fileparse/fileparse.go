@@ -77,11 +77,7 @@ func main() {
 		}
 	}()
 	for _, p := range pesPackets.PacketList.All() {
-		eop := false
-		if len(p.AdaptationField.Stuffing) > 0 {
-			eop = true
-		}
-		err = pesParser.EnqueueTSPacket(p, eop)
+		err = pesParser.EnqueueTSPacket(p)
 		if err != nil {
 			panic(err)
 		}

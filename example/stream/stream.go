@@ -83,11 +83,7 @@ func main() {
 			}
 		} else if state == 2 && v.PID == elementaryPID {
 			fmt.Println("PES received")
-			eop := false
-			if len(v.AdaptationField.Stuffing) > 0 {
-				eop = true
-			}
-			pesParser.EnqueueTSPacket(v, eop)
+			pesParser.EnqueueTSPacket(v)
 		}
 
 	}

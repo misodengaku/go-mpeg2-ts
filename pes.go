@@ -77,8 +77,8 @@ type PESParser struct {
 }
 
 type PESByte struct {
-	Datum       byte
-	EndOfPacket bool
+	Datum         byte
+	StartOfPacket bool
 }
 
 func NewPESParser(bufferSize int) PESParser {
@@ -214,15 +214,15 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					continue
 				}
 				writtenBytes := 0
-				for i, v := range pp.buffer {
-					pp.PES.ElementaryStream = append(pp.PES.ElementaryStream, v.Datum)
-					writtenBytes = i + 1
-					if v.EndOfPacket {
+				for _, v := range pp.buffer {
+					if v.StartOfPacket {
 						pc <- pp.PES
 						pp.PES = PES{}
 						state = 0
 						break
 					}
+					pp.PES.ElementaryStream = append(pp.PES.ElementaryStream, v.Datum)
+					writtenBytes += 1
 				}
 				newBuffer := make([]PESByte, 0, pp.bufferSize)
 				copy(newBuffer, pp.buffer[writtenBytes:])
@@ -234,7 +234,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 	return pc
 }
 
-func (pp *PESParser) WriteBytes(p []byte, eop bool) (n int, err error) {
+func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 	pp.mutex.Lock()
 	defer pp.mutex.Unlock()
 	inputBytes := len(p)
@@ -250,20 +250,17 @@ func (pp *PESParser) WriteBytes(p []byte, eop bool) (n int, err error) {
 		b := PESByte{Datum: v}
 		pesBytes = append(pesBytes, b)
 	}
-	pesBytes[inputBytes-1].EndOfPacket = eop
+	pesBytes[0].StartOfPacket = sop
 	pp.buffer = append(pp.buffer, pesBytes...)
 	// fmt.Printf("len: %d cap: %d\n", len(pp.buffer), cap(pp.buffer))
 	return inputBytes, nil
 }
 
-func (pp *PESParser) EnqueueTSPacket(tsPacket Packet, eop bool) error {
+func (pp *PESParser) EnqueueTSPacket(tsPacket Packet) error {
 	byteBuffer, err := tsPacket.GetPayload()
 	if err != nil {
 		return err
 	}
-	// if eop {
-	// 	fmt.Printf("byteBuffer: %#v\n", byteBuffer)
-	// }
-	_, err = pp.WriteBytes(byteBuffer, eop)
+	_, err = pp.WriteBytes(byteBuffer, tsPacket.PayloadUnitStartIndicator)
 	return err
 }
