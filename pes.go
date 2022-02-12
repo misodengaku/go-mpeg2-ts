@@ -159,13 +159,14 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					trimIndex := 2
 					if pp.PTSFlag {
 						// if (PTS_DTS_flags == '10') {
-						pp.PES.rawPTS = uint32((pp.buffer[3].Datum>>1)&0x03)<<30 | uint32(pp.buffer[4].Datum)<<22 | uint32(pp.buffer[5].Datum>>1)<<15 | uint32(pp.buffer[6].Datum)<<7 | uint32(pp.buffer[7].Datum>>1)
+						pp.PES.rawPTS = uint32((pp.buffer[3].Datum>>1)&0x07)<<30 | uint32(pp.buffer[4].Datum)<<22 | uint32(pp.buffer[5].Datum>>1)<<15 | uint32(pp.buffer[6].Datum)<<7 | uint32(pp.buffer[7].Datum>>1)
 						pp.PES.PTS = float64(pp.PES.rawPTS) / 90000 // 90kHz
 						trimIndex += 5
 					}
 					if pp.DTSFlag {
 						// if (PTS_DTS_flags == '11') {
-						pp.PES.rawDTS = uint32((pp.buffer[8].Datum>>1)&0x03)<<30 | uint32(pp.buffer[9].Datum)<<22 | uint32(pp.buffer[10].Datum>>1)<<15 | uint32(pp.buffer[11].Datum)<<7 | uint32(pp.buffer[12].Datum>>1)
+						pp.PES.rawDTS = uint32((pp.buffer[8].Datum>>1)&0x07)<<30 | uint32(pp.buffer[9].Datum)<<22 | uint32(pp.buffer[10].Datum>>1)<<15 | uint32(pp.buffer[11].Datum)<<7 | uint32(pp.buffer[12].Datum>>1)
+						pp.PES.DTS = float64(pp.PES.rawDTS) / 90000 // 90kHz
 						trimIndex += 5
 					}
 					if pp.ESCRFlag {
