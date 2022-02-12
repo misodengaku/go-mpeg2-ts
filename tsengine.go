@@ -6,17 +6,17 @@ import (
 	"time"
 )
 
-const TSEngineBufferSize = 1048576
-
 type TransportStreamEngine struct {
-	buf     []byte
-	packets PacketList
-	mutex   *sync.Mutex
+	buf        []byte
+	bufferSize int
+	packets    PacketList
+	mutex      *sync.Mutex
 }
 
-func InitTSEngine(chunkSize int) (TransportStreamEngine, error) {
+func InitTSEngine(chunkSize, bufferSize int) (TransportStreamEngine, error) {
 	tse := TransportStreamEngine{}
-	tse.buf = make([]byte, 0, TSEngineBufferSize)
+	tse.bufferSize = bufferSize
+	tse.buf = make([]byte, 0, tse.bufferSize)
 	tse.packets, _ = NewPacketList(chunkSize)
 	tse.mutex = &sync.Mutex{}
 	return tse, nil
@@ -42,8 +42,8 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 			}
 			if syncIndex == -1 {
 				// tse.buf is dirty. clear and continue
-				fmt.Println("clear buf")
-				tse.buf = make([]byte, 0, 1048576)
+				// fmt.Println("clear buf")
+				tse.buf = make([]byte, 0, tse.bufferSize)
 				tse.mutex.Unlock()
 				continue
 			} else if syncIndex > 0 {
