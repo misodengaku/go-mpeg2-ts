@@ -219,12 +219,9 @@ func (p *Packet) parseHeader() error {
 		}
 
 		// TODO: nokori
-		if fieldIndex-5 < int(af.Length) {
-			// fmt.Printf("stuffing(%d): %#v\n", len(af.Stuffing), af.Stuffing)
-			if int(af.Length)+fieldIndex-1 > len(p.Data) {
-				return fmt.Errorf("[BUG] invalid Length(%d) or fieldIndex(%d)", af.Length, fieldIndex)
-			}
-			af.Stuffing = p.Data[fieldIndex : int(af.Length)+fieldIndex-1]
+		readedAFBytes := fieldIndex - 6 + 2
+		if int(af.Length) > 0 && readedAFBytes < int(af.Length) {
+			af.Stuffing = p.Data[6+readedAFBytes : 5+int(af.Length)]
 			for i, v := range af.Stuffing {
 				if v != 0xff {
 					return fmt.Errorf("[BUG] stuffing bytes contains non-0xff byte. data:0x%02x index:%d", v, i)
