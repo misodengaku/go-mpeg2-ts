@@ -11,12 +11,14 @@ type TransportStreamEngine struct {
 	bufferSize int
 	packets    PacketList
 	mutex      *sync.Mutex
+	chunkSize  int
 }
 
 func InitTSEngine(chunkSize, bufferSize int) (TransportStreamEngine, error) {
 	tse := TransportStreamEngine{}
 	tse.bufferSize = bufferSize
 	tse.buf = make([]byte, 0, tse.bufferSize)
+	tse.chunkSize = chunkSize
 	tse.packets, _ = NewPacketList(chunkSize)
 	tse.mutex = &sync.Mutex{}
 	return tse, nil
@@ -28,7 +30,7 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 		for {
 			// fmt.Println("wait", len(tse.buf))
 			tse.mutex.Lock()
-			if len(tse.buf) < PacketSizeDefault {
+			if len(tse.buf) < tse.chunkSize {
 				tse.mutex.Unlock()
 				time.Sleep(1 * time.Microsecond)
 				continue
@@ -51,11 +53,11 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 				fmt.Printf("trim %#v\n", dirty)
 				tse.buf = tse.buf[syncIndex:]
 			}
-			buf := tse.buf[0:PacketSizeDefault]
-			if len(tse.buf) > PacketSizeDefault {
-			tse.buf = tse.buf[PacketSizeDefault:]
+			buf := tse.buf[0:tse.chunkSize]
+			if len(tse.buf) >= tse.chunkSize {
+				tse.buf = tse.buf[tse.chunkSize:]
 			}
-			err := tse.packets.AddBytes(buf, PacketSizeDefault)
+			err := tse.packets.AddBytes(buf, tse.chunkSize)
 			if err != nil {
 				tse.mutex.Unlock()
 				continue
