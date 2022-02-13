@@ -65,6 +65,8 @@ type PES struct {
 	ESCRExtension          uint16
 	ESRate                 uint32
 	ElementaryStream       []byte
+	PacketDataStream       []byte
+	Padding                []byte
 	// DSM_trick_mode_flag == 1
 }
 
@@ -112,13 +114,13 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					time.Sleep(1 * time.Microsecond)
 					continue
 				} else {
-					pp.buffer = pp.buffer[prefixIndex:]
+					pp.dequeue(prefixIndex)
 				}
 				pp.PES.Prefix = uint32(pp.buffer[0].Datum)<<16 | uint32(pp.buffer[1].Datum)<<8 | uint32(pp.buffer[2].Datum)
 				pp.PES.StreamID = pp.buffer[3].Datum
 				pp.PES.PacketLength = uint16(pp.buffer[4].Datum)<<8 | uint16(pp.buffer[5].Datum)
 
-				pp.buffer = pp.buffer[6:]
+				pp.dequeue(6)
 				state = 1
 				pp.mutex.Unlock()
 			}
@@ -134,7 +136,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 				default:
 					if (pp.buffer[0].Datum>>6)&0x03 != 0x02 {
 						// invalid. reset
-						pp.buffer = pp.buffer[1:]
+						pp.dequeue(1)
 						state = 0
 						pp.mutex.Unlock()
 						continue
@@ -178,9 +180,8 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					// CRC
 					// PES extension
 
-					pp.buffer = pp.buffer[trimIndex+1:]
+					pp.dequeue(trimIndex + 1)
 					state = 2
-					pp.mutex.Unlock()
 
 				case StreamID_ProgramStreamMap:
 					fallthrough
@@ -195,15 +196,12 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 				case StreamID_DSMCC:
 					fallthrough
 				case StreamID_H222_1_TypeE:
-					// if stream_id == program_stream_map || stream_id == private_stream_2 || stream_id == ECM || stream_id == EMM || stream_id == program_stream_directory || stream_id == DSMCC_stream || stream_id == "ITU-T Rec. H.222.1 type E stream"
-					// for i := 0; i < PES_packet_length; i++ {
-					// PES_packet_data_byte 8 bslbf
-					// }
+					state = 3
 				case StreamID_PaddingStream:
-					// for i < 0; i < PES_packet_length; i++ {
-					// padding_byte 8 bslbf
-					// }
+					state = 4
 				}
+
+				pp.mutex.Unlock()
 			}
 
 			if state == 2 {
@@ -225,14 +223,53 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					pp.PES.ElementaryStream = append(pp.PES.ElementaryStream, v.Datum)
 					writtenBytes += 1
 				}
-				newBuffer := make([]PESByte, 0, pp.bufferSize)
-				copy(newBuffer, pp.buffer[writtenBytes:])
-				pp.buffer = newBuffer
+				pp.dequeue(writtenBytes)
+				pp.mutex.Unlock()
+			}
+
+			if state == 3 {
+				pp.mutex.Lock()
+				if len(pp.buffer) < int(pp.PES.PacketLength) {
+					pp.mutex.Unlock()
+					time.Sleep(1 * time.Microsecond)
+					continue
+				}
+				fmt.Printf("StreamID is not pad %02X %d %d\n", pp.PES.StreamID, int(pp.PES.PacketLength), len(pp.buffer))
+				pp.PES.PacketDataStream = make([]byte, pp.PES.PacketLength)
+				for i, v := range pp.buffer[:pp.PES.PacketLength] {
+					pp.PES.PacketDataStream[i] = v.Datum
+				}
+				fmt.Println(pp.PES.PacketLength)
+				pp.dequeue(int(pp.PES.PacketLength))
+				state = 0
+				pp.mutex.Unlock()
+			}
+
+			if state == 4 {
+				pp.mutex.Lock()
+				if len(pp.buffer) > int(pp.PES.PacketLength) {
+					pp.mutex.Unlock()
+					time.Sleep(1 * time.Microsecond)
+					continue
+				}
+				fmt.Printf("StreamID is pad %02X %d\n", pp.PES.StreamID, int(pp.PES.PacketLength))
+				pp.PES.Padding = make([]byte, pp.PES.PacketLength)
+				for i, v := range pp.buffer[:pp.PES.PacketLength] {
+					pp.PES.Padding[i] = v.Datum
+				}
+				pp.dequeue(int(pp.PES.PacketLength))
+				state = 0
 				pp.mutex.Unlock()
 			}
 		}
 	}(pc)
 	return pc
+}
+
+func (pp *PESParser) dequeue(size int) {
+	if size > 0 {
+		pp.buffer = append(pp.buffer[:0], pp.buffer[size:]...)
+	}
 }
 
 func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {

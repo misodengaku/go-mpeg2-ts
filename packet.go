@@ -21,6 +21,7 @@ func NewPacketList(chunkSize int) (PacketList, error) {
 	pl := PacketList{}
 	pl.mutex = &sync.Mutex{}
 	pl.chunkSize = chunkSize
+	pl.packets = make([]Packet, 0, 1024)
 	return pl, nil
 }
 
@@ -30,8 +31,9 @@ func (ps *PacketList) DequeuePacket() (Packet, error) {
 	if len(ps.packets) == 0 {
 		return Packet{}, fmt.Errorf("PacketList is empty")
 	}
-	packet := (ps.packets)[0]
-	ps.packets = (ps.packets)[1:]
+	packet := ps.packets[0]
+	ps.packets = append(ps.packets[:0], ps.packets[1:]...)
+
 	return packet, nil
 }
 
