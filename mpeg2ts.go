@@ -11,12 +11,6 @@ func New(chunkSize int) *MPEG2TS {
 	return &m
 }
 
-func NewWithPacketCount(packetCount int64, chunkSize int) *MPEG2TS {
-	m := New(chunkSize)
-	m.PacketList.packets = make([]Packet, 0, packetCount)
-	return m
-}
-
 func LoadStandardTS(fname string) (*MPEG2TS, error) {
 	return loadFile(fname, PacketSizeDefault)
 }
@@ -42,7 +36,7 @@ func loadFile(fname string, packetLength int) (*MPEG2TS, error) {
 		return nil, fmt.Errorf("filesize (%d) is smaller than the minimum (%d)", fsize, PacketSizeDefault)
 	}
 
-	m := NewWithPacketCount(fsize/int64(packetLength), packetLength)
+	m := New(packetLength) //NewWithPacketCount(fsize/int64(packetLength), packetLength)
 
 	packetBuffer := make([]byte, packetLength)
 	i := 0

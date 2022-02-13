@@ -2,8 +2,6 @@ package mpeg2ts
 
 import (
 	"fmt"
-	"sync"
-	"time"
 )
 
 const (
@@ -71,10 +69,10 @@ type PES struct {
 }
 
 type PESParser struct {
-	packetCount int
-	buffer      []PESByte
-	bufferSize  int
-	mutex       *sync.Mutex
+	packetCount      int
+	buffer           []PESByte
+	bufferSize       int
+	byteIncomingChan chan []PESByte
 	PES
 }
 
@@ -86,7 +84,7 @@ type PESByte struct {
 func NewPESParser(bufferSize int) PESParser {
 	p := PESParser{packetCount: 0, bufferSize: bufferSize}
 	p.buffer = make([]PESByte, 0, p.bufferSize)
-	p.mutex = &sync.Mutex{}
+	p.byteIncomingChan = make(chan []PESByte)
 	return p
 }
 
@@ -94,172 +92,153 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 	pc := make(chan PES)
 	go func(pesOutChan chan PES) {
 		state := 0
-		for {
-			if state == 0 {
-				pp.mutex.Lock()
-				if len(pp.buffer) < 6 {
-					pp.mutex.Unlock()
-					time.Sleep(1 * time.Microsecond)
-					continue
-				}
-				prefixIndex := -1
-				for i := 0; i < len(pp.buffer)-3; i++ {
-					if pp.buffer[i].Datum == 0 && pp.buffer[i+1].Datum == 0 && pp.buffer[i+2].Datum == 1 {
-						prefixIndex = i
+		for in := range pp.byteIncomingChan {
+			pp.buffer = append(pp.buffer, in...)
+			for len(pp.buffer) > 0 {
+				if state == 0 {
+					if len(pp.buffer) < 6 {
 						break
 					}
-				}
-				if prefixIndex == -1 {
-					pp.mutex.Unlock()
-					time.Sleep(1 * time.Microsecond)
-					continue
-				} else {
-					pp.dequeue(prefixIndex)
-				}
-				pp.PES.Prefix = uint32(pp.buffer[0].Datum)<<16 | uint32(pp.buffer[1].Datum)<<8 | uint32(pp.buffer[2].Datum)
-				pp.PES.StreamID = pp.buffer[3].Datum
-				pp.PES.PacketLength = uint16(pp.buffer[4].Datum)<<8 | uint16(pp.buffer[5].Datum)
-
-				pp.dequeue(6)
-				state = 1
-				pp.mutex.Unlock()
-			}
-
-			if state == 1 {
-				pp.mutex.Lock()
-				if len(pp.buffer) < 13 {
-					pp.mutex.Unlock()
-					time.Sleep(1 * time.Microsecond)
-					continue
-				}
-				switch pp.PES.StreamID {
-				default:
-					if (pp.buffer[0].Datum>>6)&0x03 != 0x02 {
-						// invalid. reset
-						pp.dequeue(1)
-						state = 0
-						pp.mutex.Unlock()
-						continue
+					prefixIndex := -1
+					for i := 0; i < len(pp.buffer)-3; i++ {
+						if pp.buffer[i].Datum == 0 && pp.buffer[i+1].Datum == 0 && pp.buffer[i+2].Datum == 1 {
+							prefixIndex = i
+							break
+						}
 					}
-
-					pp.PES.ScramblingControl = (pp.buffer[0].Datum >> 4) & 0x03
-					pp.PES.Priority = (pp.buffer[0].Datum>>3)&0x01 == 1
-					pp.PES.DataAlignment = (pp.buffer[0].Datum>>2)&0x01 == 1
-					pp.PES.Copyright = (pp.buffer[0].Datum>>1)&0x01 == 1
-					pp.PES.Original = (pp.buffer[0].Datum)&0x01 == 1
-					pp.PES.PTSFlag = (pp.buffer[1].Datum>>7)&0x01 == 1
-					pp.PES.DTSFlag = (pp.buffer[1].Datum>>6)&0x01 == 1
-					pp.PES.ESCRFlag = (pp.buffer[1].Datum>>5)&0x01 == 1
-					pp.PES.ESRateFlag = (pp.buffer[1].Datum>>4)&0x01 == 1
-					pp.PES.DSMTrickModeFlag = (pp.buffer[1].Datum>>3)&0x01 == 1
-					pp.PES.AdditionalCopyInfoFlag = (pp.buffer[1].Datum>>2)&0x01 == 1
-					pp.PES.CRCFlag = (pp.buffer[1].Datum>>1)&0x01 == 1
-					pp.PES.ExtensionFlag = (pp.buffer[1].Datum)&0x01 == 1
-					pp.PES.HeaderDataLength = pp.buffer[2].Datum
-
-					// PES header
-					trimIndex := 2
-					if pp.PTSFlag {
-						// if (PTS_DTS_flags == '10') {
-						pp.PES.rawPTS = uint32((pp.buffer[3].Datum>>1)&0x07)<<30 | uint32(pp.buffer[4].Datum)<<22 | uint32(pp.buffer[5].Datum>>1)<<15 | uint32(pp.buffer[6].Datum)<<7 | uint32(pp.buffer[7].Datum>>1)
-						pp.PES.PTS = float64(pp.PES.rawPTS) / 90000 // 90kHz
-						trimIndex += 5
+					if prefixIndex == -1 {
+						break
+					} else {
+						pp.dequeue(prefixIndex)
 					}
-					if pp.DTSFlag {
-						// if (PTS_DTS_flags == '11') {
-						pp.PES.rawDTS = uint32((pp.buffer[8].Datum>>1)&0x07)<<30 | uint32(pp.buffer[9].Datum)<<22 | uint32(pp.buffer[10].Datum>>1)<<15 | uint32(pp.buffer[11].Datum)<<7 | uint32(pp.buffer[12].Datum>>1)
-						pp.PES.DTS = float64(pp.PES.rawDTS) / 90000 // 90kHz
-						trimIndex += 5
-					}
-					if pp.ESCRFlag {
-						// pp.ESCRBase = pp.buffer
-					}
-					// ESRate
-					// DSMtrick
-					// additionalCopyInfo
-					// CRC
-					// PES extension
+					pp.PES.Prefix = uint32(pp.buffer[0].Datum)<<16 | uint32(pp.buffer[1].Datum)<<8 | uint32(pp.buffer[2].Datum)
+					pp.PES.StreamID = pp.buffer[3].Datum
+					pp.PES.PacketLength = uint16(pp.buffer[4].Datum)<<8 | uint16(pp.buffer[5].Datum)
 
-					pp.dequeue(trimIndex + 1)
-					state = 2
-
-				case StreamID_ProgramStreamMap:
-					fallthrough
-				case StreamID_PrivateStream2:
-					fallthrough
-				case StreamID_ECM:
-					fallthrough
-				case StreamID_EMM:
-					fallthrough
-				case StreamID_ProgramStreamDirectory:
-					fallthrough
-				case StreamID_DSMCC:
-					fallthrough
-				case StreamID_H222_1_TypeE:
-					state = 3
-				case StreamID_PaddingStream:
-					state = 4
+					pp.dequeue(6)
+					state = 1
 				}
 
-				pp.mutex.Unlock()
-			}
-
-			if state == 2 {
-				// read payload
-				pp.mutex.Lock()
-				if len(pp.buffer) == 0 {
-					pp.mutex.Unlock()
-					time.Sleep(1 * time.Microsecond)
-					continue
-				}
-				writtenBytes := 0
-				for _, v := range pp.buffer {
-					if v.StartOfPacket {
-						pc <- pp.PES
-						pp.PES = PES{}
-						state = 0
+				if state == 1 {
+					if len(pp.buffer) < 13 {
 						break
 					}
-					pp.PES.ElementaryStream = append(pp.PES.ElementaryStream, v.Datum)
-					writtenBytes += 1
-				}
-				pp.dequeue(writtenBytes)
-				pp.mutex.Unlock()
-			}
+					switch pp.PES.StreamID {
+					default:
+						if (pp.buffer[0].Datum>>6)&0x03 != 0x02 {
+							// invalid. reset
+							pp.dequeue(1)
+							state = 0
+							break
+						}
 
-			if state == 3 {
-				pp.mutex.Lock()
-				if len(pp.buffer) < int(pp.PES.PacketLength) {
-					pp.mutex.Unlock()
-					time.Sleep(1 * time.Microsecond)
-					continue
-				}
-				fmt.Printf("StreamID is not pad %02X %d %d\n", pp.PES.StreamID, int(pp.PES.PacketLength), len(pp.buffer))
-				pp.PES.PacketDataStream = make([]byte, pp.PES.PacketLength)
-				for i, v := range pp.buffer[:pp.PES.PacketLength] {
-					pp.PES.PacketDataStream[i] = v.Datum
-				}
-				fmt.Println(pp.PES.PacketLength)
-				pp.dequeue(int(pp.PES.PacketLength))
-				state = 0
-				pp.mutex.Unlock()
-			}
+						pp.PES.ScramblingControl = (pp.buffer[0].Datum >> 4) & 0x03
+						pp.PES.Priority = (pp.buffer[0].Datum>>3)&0x01 == 1
+						pp.PES.DataAlignment = (pp.buffer[0].Datum>>2)&0x01 == 1
+						pp.PES.Copyright = (pp.buffer[0].Datum>>1)&0x01 == 1
+						pp.PES.Original = (pp.buffer[0].Datum)&0x01 == 1
+						pp.PES.PTSFlag = (pp.buffer[1].Datum>>7)&0x01 == 1
+						pp.PES.DTSFlag = (pp.buffer[1].Datum>>6)&0x01 == 1
+						pp.PES.ESCRFlag = (pp.buffer[1].Datum>>5)&0x01 == 1
+						pp.PES.ESRateFlag = (pp.buffer[1].Datum>>4)&0x01 == 1
+						pp.PES.DSMTrickModeFlag = (pp.buffer[1].Datum>>3)&0x01 == 1
+						pp.PES.AdditionalCopyInfoFlag = (pp.buffer[1].Datum>>2)&0x01 == 1
+						pp.PES.CRCFlag = (pp.buffer[1].Datum>>1)&0x01 == 1
+						pp.PES.ExtensionFlag = (pp.buffer[1].Datum)&0x01 == 1
+						pp.PES.HeaderDataLength = pp.buffer[2].Datum
 
-			if state == 4 {
-				pp.mutex.Lock()
-				if len(pp.buffer) > int(pp.PES.PacketLength) {
-					pp.mutex.Unlock()
-					time.Sleep(1 * time.Microsecond)
-					continue
+						// PES header
+						trimIndex := 2
+						if pp.PTSFlag {
+							// if (PTS_DTS_flags == '10') {
+							pp.PES.rawPTS = uint32((pp.buffer[3].Datum>>1)&0x07)<<30 | uint32(pp.buffer[4].Datum)<<22 | uint32(pp.buffer[5].Datum>>1)<<15 | uint32(pp.buffer[6].Datum)<<7 | uint32(pp.buffer[7].Datum>>1)
+							pp.PES.PTS = float64(pp.PES.rawPTS) / 90000 // 90kHz
+							trimIndex += 5
+						}
+						if pp.DTSFlag {
+							// if (PTS_DTS_flags == '11') {
+							pp.PES.rawDTS = uint32((pp.buffer[8].Datum>>1)&0x07)<<30 | uint32(pp.buffer[9].Datum)<<22 | uint32(pp.buffer[10].Datum>>1)<<15 | uint32(pp.buffer[11].Datum)<<7 | uint32(pp.buffer[12].Datum>>1)
+							pp.PES.DTS = float64(pp.PES.rawDTS) / 90000 // 90kHz
+							trimIndex += 5
+						}
+						if pp.ESCRFlag {
+							// pp.ESCRBase = pp.buffer
+						}
+						// ESRate
+						// DSMtrick
+						// additionalCopyInfo
+						// CRC
+						// PES extension
+
+						pp.dequeue(trimIndex + 1)
+						state = 2
+
+					case StreamID_ProgramStreamMap:
+						fallthrough
+					case StreamID_PrivateStream2:
+						fallthrough
+					case StreamID_ECM:
+						fallthrough
+					case StreamID_EMM:
+						fallthrough
+					case StreamID_ProgramStreamDirectory:
+						fallthrough
+					case StreamID_DSMCC:
+						fallthrough
+					case StreamID_H222_1_TypeE:
+						state = 3
+					case StreamID_PaddingStream:
+						state = 4
+					}
+
 				}
-				fmt.Printf("StreamID is pad %02X %d\n", pp.PES.StreamID, int(pp.PES.PacketLength))
-				pp.PES.Padding = make([]byte, pp.PES.PacketLength)
-				for i, v := range pp.buffer[:pp.PES.PacketLength] {
-					pp.PES.Padding[i] = v.Datum
+
+				if state == 2 {
+					// read payload
+					if len(pp.buffer) == 0 {
+						break
+					}
+					writtenBytes := 0
+					for _, v := range pp.buffer {
+						if v.StartOfPacket {
+							pc <- pp.PES
+							pp.PES = PES{}
+							state = 0
+							break
+						}
+						pp.PES.ElementaryStream = append(pp.PES.ElementaryStream, v.Datum)
+						writtenBytes += 1
+					}
+					pp.dequeue(writtenBytes)
 				}
-				pp.dequeue(int(pp.PES.PacketLength))
-				state = 0
-				pp.mutex.Unlock()
+
+				if state == 3 {
+					if len(pp.buffer) < int(pp.PES.PacketLength) {
+						break
+					}
+					fmt.Printf("StreamID is not pad %02X %d %d\n", pp.PES.StreamID, int(pp.PES.PacketLength), len(pp.buffer))
+					pp.PES.PacketDataStream = make([]byte, pp.PES.PacketLength)
+					for i, v := range pp.buffer[:pp.PES.PacketLength] {
+						pp.PES.PacketDataStream[i] = v.Datum
+					}
+					fmt.Println(pp.PES.PacketLength)
+					pp.dequeue(int(pp.PES.PacketLength))
+					state = 0
+				}
+
+				if state == 4 {
+					if len(pp.buffer) > int(pp.PES.PacketLength) {
+						break
+					}
+					fmt.Printf("StreamID is pad %02X %d\n", pp.PES.StreamID, int(pp.PES.PacketLength))
+					pp.PES.Padding = make([]byte, pp.PES.PacketLength)
+					for i, v := range pp.buffer[:pp.PES.PacketLength] {
+						pp.PES.Padding[i] = v.Datum
+					}
+					pp.dequeue(int(pp.PES.PacketLength))
+					state = 0
+				}
+
 			}
 		}
 	}(pc)
@@ -273,25 +252,27 @@ func (pp *PESParser) dequeue(size int) {
 }
 
 func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
-	pp.mutex.Lock()
-	defer pp.mutex.Unlock()
-	inputBytes := len(p)
-	if len(pp.buffer) == cap(pp.buffer) {
-		return 0, fmt.Errorf("bytebuffer full")
-	}
-	if inputBytes+len(pp.buffer) > cap(pp.buffer) {
-		inputBytes = cap(pp.buffer) - len(pp.buffer)
-	}
+	// pp.mutex.Lock()
+	// defer pp.mutex.Unlock()
+	// fmt.Printf("1 %p len: %d cap: %d\n", pp.buffer, len(pp.buffer), cap(pp.buffer))
+	// inputBytes := len(p)
+	// if len(pp.buffer) == cap(pp.buffer) {
+	// 	return 0, fmt.Errorf("bytebuffer full")
+	// }
+	// if inputBytes+len(pp.buffer) > cap(pp.buffer) {
+	// 	inputBytes = cap(pp.buffer) - len(pp.buffer)
+	// }
 
-	pesBytes := make([]PESByte, 0, inputBytes)
-	for _, v := range p[:inputBytes] {
+	pesBytes := make([]PESByte, 0, len(p))
+	for _, v := range p {
 		b := PESByte{Datum: v}
 		pesBytes = append(pesBytes, b)
 	}
 	pesBytes[0].StartOfPacket = sop
-	pp.buffer = append(pp.buffer, pesBytes...)
-	// fmt.Printf("len: %d cap: %d\n", len(pp.buffer), cap(pp.buffer))
-	return inputBytes, nil
+	pp.byteIncomingChan <- pesBytes
+	// pp.buffer = append(pp.buffer, pesBytes...)
+	// fmt.Printf("2 %p len: %d cap: %d\n", pp.buffer, len(pp.buffer), cap(pp.buffer))
+	return len(p), nil
 }
 
 func (pp *PESParser) EnqueueTSPacket(tsPacket Packet) error {
