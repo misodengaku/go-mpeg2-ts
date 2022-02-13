@@ -52,7 +52,9 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 				tse.buf = tse.buf[syncIndex:]
 			}
 			buf := tse.buf[0:PacketSizeDefault]
+			if len(tse.buf) > PacketSizeDefault {
 			tse.buf = tse.buf[PacketSizeDefault:]
+			}
 			err := tse.packets.AddBytes(buf, PacketSizeDefault)
 			if err != nil {
 				tse.mutex.Unlock()
@@ -83,7 +85,7 @@ func (tse *TransportStreamEngine) Write(p []byte) (n int, err error) {
 		inputBytes = cap(tse.buf) - len(tse.buf)
 	}
 
-	tse.buf = append(tse.buf, p[:inputBytes-1]...)
+	tse.buf = append(tse.buf, p[:inputBytes]...)
 	// fmt.Println("written", len(tse.buf))
 
 	return inputBytes, nil
