@@ -2,6 +2,7 @@ package mpeg2ts
 
 import (
 	"fmt"
+	"sync"
 )
 
 const (
@@ -73,6 +74,7 @@ type PESParser struct {
 	buffer           []PESByte
 	bufferSize       int
 	byteIncomingChan chan []PESByte
+	mutex            *sync.Mutex
 	PES
 }
 
@@ -82,31 +84,41 @@ type PESByte struct {
 }
 
 func NewPESParser(bufferSize int) PESParser {
-	p := PESParser{packetCount: 0, bufferSize: bufferSize}
-	p.buffer = make([]PESByte, 0, p.bufferSize)
-	p.byteIncomingChan = make(chan []PESByte)
-	return p
+	pp := PESParser{packetCount: 0, bufferSize: bufferSize}
+	pp.buffer = make([]PESByte, 0, pp.bufferSize)
+	pp.byteIncomingChan = make(chan []PESByte, 1048576)
+	pp.mutex = &sync.Mutex{}
+	return pp
 }
 
 func (pp *PESParser) StartPESReadLoop() chan PES {
 	pc := make(chan PES)
 	go func(pesOutChan chan PES) {
 		state := 0
-		for in := range pp.byteIncomingChan {
-			pp.buffer = append(pp.buffer, in...)
-			for len(pp.buffer) > 0 {
+		for w := range pp.byteIncomingChan {
+			in := make([]PESByte, len(w))
+			copy(in, w)
+			pp.enqueue(in)
+			eor := false
+			for pp.getBufferLength() > 0 && !eor {
 				if state == 0 {
-					if len(pp.buffer) < 6 {
+					if pp.getBufferLength() < 6 {
+						// buffer is too short
+						eor = true
 						break
 					}
 					prefixIndex := -1
-					for i := 0; i < len(pp.buffer)-3; i++ {
+					for i := 0; i < pp.getBufferLength()-3; i++ {
 						if pp.buffer[i].Datum == 0 && pp.buffer[i+1].Datum == 0 && pp.buffer[i+2].Datum == 1 {
 							prefixIndex = i
+							eor = true
 							break
 						}
 					}
 					if prefixIndex == -1 {
+						// sync byte is not found
+						pp.dequeue(pp.getBufferLength())
+						eor = true
 						break
 					} else {
 						pp.dequeue(prefixIndex)
@@ -120,7 +132,9 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 				}
 
 				if state == 1 {
-					if len(pp.buffer) < 13 {
+					if pp.getBufferLength() < 13 {
+						// buffer is too short
+						eor = true
 						break
 					}
 					switch pp.PES.StreamID {
@@ -129,6 +143,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 							// invalid. reset
 							pp.dequeue(1)
 							state = 0
+							eor = true
 							break
 						}
 
@@ -195,13 +210,18 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 
 				if state == 2 {
 					// read payload
-					if len(pp.buffer) == 0 {
+					if pp.getBufferLength() == 0 {
+						// buffer is empty
+						eor = true
 						break
 					}
 					writtenBytes := 0
+
+					pp.mutex.Lock()
 					for _, v := range pp.buffer {
 						if v.StartOfPacket {
-							pc <- pp.PES
+							pr := pp.PES.DeepCopy()
+							pc <- pr
 							pp.PES = PES{}
 							state = 0
 							break
@@ -210,31 +230,41 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 						writtenBytes += 1
 					}
 					pp.dequeue(writtenBytes)
+					pp.mutex.Unlock()
 				}
 
 				if state == 3 {
-					if len(pp.buffer) < int(pp.PES.PacketLength) {
+					if pp.getBufferLength() < int(pp.PES.PacketLength) {
+						// buffer is too short
+						eor = true
 						break
 					}
-					fmt.Printf("StreamID is not pad %02X %d %d\n", pp.PES.StreamID, int(pp.PES.PacketLength), len(pp.buffer))
+					//fmt.Printf("StreamID is not pad %02X %d %d\n", pp.PES.StreamID, int(pp.PES.PacketLength), pp.getBufferLength())
 					pp.PES.PacketDataStream = make([]byte, pp.PES.PacketLength)
+
+					pp.mutex.Lock()
 					for i, v := range pp.buffer[:pp.PES.PacketLength] {
 						pp.PES.PacketDataStream[i] = v.Datum
 					}
+					pp.mutex.Unlock()
 					fmt.Println(pp.PES.PacketLength)
 					pp.dequeue(int(pp.PES.PacketLength))
 					state = 0
 				}
 
 				if state == 4 {
-					if len(pp.buffer) > int(pp.PES.PacketLength) {
+					if pp.getBufferLength() > int(pp.PES.PacketLength) {
+						// buffer is too short
+						eor = true
 						break
 					}
-					fmt.Printf("StreamID is pad %02X %d\n", pp.PES.StreamID, int(pp.PES.PacketLength))
+					//fmt.Printf("StreamID is pad %02X %d\n", pp.PES.StreamID, int(pp.PES.PacketLength))
 					pp.PES.Padding = make([]byte, pp.PES.PacketLength)
+					pp.mutex.Lock()
 					for i, v := range pp.buffer[:pp.PES.PacketLength] {
 						pp.PES.Padding[i] = v.Datum
 					}
+					pp.mutex.Unlock()
 					pp.dequeue(int(pp.PES.PacketLength))
 					state = 0
 				}
@@ -245,10 +275,27 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 	return pc
 }
 
-func (pp *PESParser) dequeue(size int) {
+func (pp *PESParser) dequeue(size int) []PESByte {
+	var r []PESByte
 	if size > 0 {
+		r = pp.buffer[:size]
 		pp.buffer = append(pp.buffer[:0], pp.buffer[size:]...)
 	}
+	return r
+}
+
+func (pp *PESParser) enqueue(in []PESByte) {
+	pp.buffer = append(pp.buffer, in...)
+}
+
+func (pp *PESParser) getBufferLength() int {
+	//fmt.Println("pp len lock")
+	// pp.mutex.Lock()
+	l := len(pp.buffer)
+	// fmt.Println("len ", l)
+	// pp.mutex.Unlock()
+	//fmt.Println("pp len unlock")
+	return l
 }
 
 func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
@@ -263,9 +310,10 @@ func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 	// 	inputBytes = cap(pp.buffer) - len(pp.buffer)
 	// }
 
+	var b PESByte
 	pesBytes := make([]PESByte, 0, len(p))
 	for _, v := range p {
-		b := PESByte{Datum: v}
+		b = PESByte{Datum: v}
 		pesBytes = append(pesBytes, b)
 	}
 	pesBytes[0].StartOfPacket = sop
