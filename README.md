@@ -6,12 +6,15 @@
 see under [example](./example/) directory
 
 ```go
-	mpeg2, err := mpeg2ts.LoadStandardTS("../files/test.ts")
+import mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
+
+func main() {
+	mpeg2, err := mpeg2ts.LoadStandardTS("test.ts")
 	if err != nil {
 		panic(err)
 	}
 
-    elementaryPID := uint16(0x0041)
+	elementaryPID := uint16(0x0041)
 	pesPackets := mpeg2.FilterByPIDs(elementaryPID)
 	pesParser := mpeg2ts.NewPESParser(8 * 1048576)
 	pesChan := pesParser.StartPESReadLoop()
@@ -38,6 +41,7 @@ see under [example](./example/) directory
 			panic(err)
 		}
 	}
+}
 ```
 
 ## generate test video
