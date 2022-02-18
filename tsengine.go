@@ -62,10 +62,6 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 				if err != nil {
 					fmt.Printf("[ERROR] %s\n", err)
 				} else {
-					if len(packet.Data) != 188 {
-						fmt.Println("packetout size=", len(packet.Data))
-
-					}
 					packetOutChan <- packet
 				}
 			}

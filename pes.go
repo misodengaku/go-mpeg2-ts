@@ -232,7 +232,6 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					}
 					pp.dequeue(writtenBytes)
 					pp.mutex.Unlock()
-
 				}
 
 				if state == 3 {
