@@ -47,23 +47,17 @@ func (p *Packet) ParsePAT() (PAT, error) {
 	pat.SectionNumber = payload[7]
 	pat.LastSectionNumber = payload[8]
 
-	fmt.Printf("PAT: %#v\r\n", pat)
-
 	pat.Programs = make([]PATProgram, (pat.SectionLength-5-4)/4)
 	for i := uint16(0); i < (pat.SectionLength-5-4)/4; i++ {
 		base := 9 + i*4
-		// fmt.Println("base", base, len(payload))
 		pat.Programs[i].ProgramNumber = uint16(payload[base])<<8 | uint16(payload[base+1])
 		if pat.Programs[i].ProgramNumber == 0x0000 {
 			pat.Programs[i].NetworkPID = uint16(payload[base+2]&0x1f)<<8 | uint16(payload[base+3])&0x1fff
 		} else {
 			pat.Programs[i].ProgramMapPID = uint16(payload[base+2]&0x1f)<<8 | uint16(payload[base+3])&0x1fff
 		}
-		// pat.Programs[i].ProgramMapPID = uint16(payload[base+2]&0x1f)<<8 | uint16(payload[base+3])
 	}
-	// fmt.Printf("CRC32 dump: %02x %02x %02x %02x\r\n", uint(payload[pat.SectionLength]), uint(payload[pat.SectionLength+1]), uint(payload[pat.SectionLength+2]), uint(payload[pat.SectionLength+3]))
 	pat.CRC32 = uint(payload[pat.SectionLength])<<24 | uint(payload[pat.SectionLength+1])<<16 | uint(payload[pat.SectionLength+2])<<8 | uint(payload[pat.SectionLength+3])
-	// fmt.Printf("%#v\r\n", payload[1:pat.SectionLength])
 
 	crc := calculateCRC(payload[1:pat.SectionLength])
 	if uint32(pat.CRC32) != crc {

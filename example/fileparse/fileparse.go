@@ -8,6 +8,8 @@ import (
 	mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
 )
 
+var enableESDump = false
+
 var mpeg2 *mpeg2ts.MPEG2TS
 
 func main() {
@@ -70,13 +72,16 @@ func main() {
 			go func(index int, pes mpeg2ts.PES) {
 
 				fmt.Printf("ES frame: %dbytes\n", len(p.ElementaryStream))
-				fname := fmt.Sprintf("es_%04d.bin", i)
-				os.WriteFile(fname, p.ElementaryStream, 0644)
+				if enableESDump {
+					fname := fmt.Sprintf("es_%04d.bin", i)
+					os.WriteFile(fname, p.ElementaryStream, 0644)
+				}
 			}(i, p)
 			i++
 		}
 	}()
-	for _, p := range pesPackets.PacketList.All() {
+	packets := pesPackets.PacketList.All()
+	for _, p := range packets {
 		err = pesParser.EnqueueTSPacket(p)
 		if err != nil {
 			panic(err)

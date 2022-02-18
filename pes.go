@@ -40,6 +40,7 @@ type PES struct {
 	Prefix       uint32
 	StreamID     byte
 	PacketLength uint16
+	ProgramClockReference
 
 	// stream_id != program_stream_map && stream_id != padding_stream && stream_id != private_stream_2 && stream_id != ECM && stream_id != EMM && stream_id != program_stream_directory && stream_id != DSMCC_stream && stream_id != ITU-T Rec. H.222.1 type E stream
 	ScramblingControl      byte
@@ -239,7 +240,6 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 						eor = true
 						break
 					}
-					//fmt.Printf("StreamID is not pad %02X %d %d\n", pp.PES.StreamID, int(pp.PES.PacketLength), pp.getBufferLength())
 					pp.PES.PacketDataStream = make([]byte, pp.PES.PacketLength)
 
 					pp.mutex.Lock()
@@ -258,7 +258,6 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 						eor = true
 						break
 					}
-					//fmt.Printf("StreamID is pad %02X %d\n", pp.PES.StreamID, int(pp.PES.PacketLength))
 					pp.PES.Padding = make([]byte, pp.PES.PacketLength)
 					pp.mutex.Lock()
 					for i, v := range pp.buffer[:pp.PES.PacketLength] {
@@ -289,27 +288,13 @@ func (pp *PESParser) enqueue(in []PESByte) {
 }
 
 func (pp *PESParser) getBufferLength() int {
-	//fmt.Println("pp len lock")
-	// pp.mutex.Lock()
 	l := len(pp.buffer)
-	// fmt.Println("len ", l)
-	// pp.mutex.Unlock()
-	//fmt.Println("pp len unlock")
 	return l
 }
 
-func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
-	// pp.mutex.Lock()
-	// defer pp.mutex.Unlock()
-	// fmt.Printf("1 %p len: %d cap: %d\n", pp.buffer, len(pp.buffer), cap(pp.buffer))
-	// inputBytes := len(p)
-	// if len(pp.buffer) == cap(pp.buffer) {
-	// 	return 0, fmt.Errorf("bytebuffer full")
-	// }
-	// if inputBytes+len(pp.buffer) > cap(pp.buffer) {
-	// 	inputBytes = cap(pp.buffer) - len(pp.buffer)
-	// }
+var i = 0
 
+func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 	var b PESByte
 	pesBytes := make([]PESByte, 0, len(p))
 	for _, v := range p {
@@ -318,8 +303,7 @@ func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 	}
 	pesBytes[0].StartOfPacket = sop
 	pp.byteIncomingChan <- pesBytes
-	// pp.buffer = append(pp.buffer, pesBytes...)
-	// fmt.Printf("2 %p len: %d cap: %d\n", pp.buffer, len(pp.buffer), cap(pp.buffer))
+	i++
 	return len(p), nil
 }
 

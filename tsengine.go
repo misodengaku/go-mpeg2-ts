@@ -3,6 +3,7 @@ package mpeg2ts
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 type TransportStreamEngine struct {
@@ -28,7 +29,11 @@ func InitTSEngine(chunkSize, bufferSize int) (TransportStreamEngine, error) {
 func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 	cp := make(chan Packet)
 	go func(packetOutChan chan Packet) {
-		for range tse.byteIncomingChan {
+		for {
+			if tse.getBufferLength() < tse.chunkSize {
+				time.Sleep(1 * time.Millisecond)
+				continue
+			}
 			tse.mutex.Lock()
 			for len(tse.buffer) >= tse.chunkSize {
 				syncIndex := -1
@@ -40,21 +45,24 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 				}
 				if syncIndex == -1 {
 					// tse.buffer is dirty. clear and continue
-					tse.dequeue(1)
+					fmt.Println("sync byte is not found in buffer", len(tse.buffer))
+					tse.dequeueWithoutLock(len(tse.buffer))
 					continue
+				} else if syncIndex > 0 {
+					fmt.Printf("synced. drop %dbytes\n", syncIndex)
+				}
+				packetData := tse.dequeueWithoutLock(tse.chunkSize)
+				if packetData == nil {
+					break
 				}
 				packet := Packet{}
 				packet.Data = make([]byte, tse.chunkSize)
-				r := tse.dequeue(tse.chunkSize)
-				if r == nil {
-					break
-				}
-				copy(packet.Data, r)
+				copy(packet.Data, packetData)
 				err := packet.parseHeader()
 				if err != nil {
 					fmt.Printf("[ERROR] %s\n", err)
 				} else {
-				packetOutChan <- packet
+					packetOutChan <- packet
 				}
 			}
 			tse.mutex.Unlock()
@@ -63,10 +71,9 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 	return cp
 }
 
-func (tse *TransportStreamEngine) dequeue(size int) []byte {
+func (tse *TransportStreamEngine) dequeueWithoutLock(size int) []byte {
 	var r []byte
-	if size > 0 && len(tse.buffer) > tse.chunkSize {
-	// tse.mutex.Lock()
+	if size > 0 && len(tse.buffer) >= size {
 		r = make([]byte, size)
 		copy(r, tse.buffer)
 		tse.buffer = append(tse.buffer[:0], tse.buffer[size:]...)
@@ -74,20 +81,31 @@ func (tse *TransportStreamEngine) dequeue(size int) []byte {
 	}
 	return nil
 }
+func (tse *TransportStreamEngine) dequeue(size int) []byte {
+	tse.mutex.Lock()
+	r := tse.dequeueWithoutLock(size)
+	tse.mutex.Unlock()
+	return r
+}
 
-func (tse *TransportStreamEngine) enqueue(in []byte) {
+func (tse *TransportStreamEngine) enqueueWithoutLock(in []byte) {
 	tse.buffer = append(tse.buffer, in...)
 }
 
+func (tse *TransportStreamEngine) enqueue(in []byte) {
+	tse.mutex.Lock()
+	tse.enqueueWithoutLock(in)
+	tse.mutex.Unlock()
+}
+
 func (tse *TransportStreamEngine) getBufferLength() int {
+	tse.mutex.Lock()
 	l := len(tse.buffer)
+	tse.mutex.Unlock()
 	return l
 }
 
 func (tse *TransportStreamEngine) Write(p []byte) (n int, err error) {
-	tse.mutex.Lock()
 	tse.enqueue(p)
-	tse.mutex.Unlock()
-	tse.byteIncomingChan <- struct{}{}
 	return len(p), nil
 }
