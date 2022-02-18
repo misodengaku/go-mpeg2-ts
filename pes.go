@@ -40,6 +40,7 @@ type PES struct {
 	Prefix       uint32
 	StreamID     byte
 	PacketLength uint16
+	ProgramClockReference
 
 	// stream_id != program_stream_map && stream_id != padding_stream && stream_id != private_stream_2 && stream_id != ECM && stream_id != EMM && stream_id != program_stream_directory && stream_id != DSMCC_stream && stream_id != ITU-T Rec. H.222.1 type E stream
 	ScramblingControl      byte
@@ -98,9 +99,12 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 		for w := range pp.byteIncomingChan {
 			in := make([]PESByte, len(w))
 			copy(in, w)
+			//fmt.Printf("incoming %p %p\n", in, pp.buffer)
+			// pp.buffer = append(pp.buffer, in...)
 			pp.enqueue(in)
 			eor := false
 			for pp.getBufferLength() > 0 && !eor {
+				// fmt.Println("buflen", pp.getBufferLength(), "state", state)
 				if state == 0 {
 					if pp.getBufferLength() < 6 {
 						// buffer is too short
@@ -231,6 +235,8 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					}
 					pp.dequeue(writtenBytes)
 					pp.mutex.Unlock()
+					// fmt.Println("state2 end", writtenBytes)
+
 				}
 
 				if state == 3 {
@@ -276,16 +282,25 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 }
 
 func (pp *PESParser) dequeue(size int) []PESByte {
+	// fmt.Println("deq", size)
 	var r []PESByte
 	if size > 0 {
+		//fmt.Println("pp deq lock")
+		// pp.mutex.Lock()
 		r = pp.buffer[:size]
 		pp.buffer = append(pp.buffer[:0], pp.buffer[size:]...)
+		// pp.mutex.Unlock()
+		//fmt.Println("pp deq unlock")
 	}
 	return r
 }
 
 func (pp *PESParser) enqueue(in []PESByte) {
+	//fmt.Println("pp enq lock")
+	// pp.mutex.Lock()
 	pp.buffer = append(pp.buffer, in...)
+	// pp.mutex.Unlock()
+	//fmt.Println("pp enq unlock")
 }
 
 func (pp *PESParser) getBufferLength() int {
@@ -298,10 +313,12 @@ func (pp *PESParser) getBufferLength() int {
 	return l
 }
 
+var i = 0
+
 func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 	// pp.mutex.Lock()
 	// defer pp.mutex.Unlock()
-	// fmt.Printf("1 %p len: %d cap: %d\n", pp.buffer, len(pp.buffer), cap(pp.buffer))
+	// //fmt.Printf("1 %p len: %d cap: %d\n", pp.buffer, len(pp.buffer), cap(pp.buffer))
 	// inputBytes := len(p)
 	// if len(pp.buffer) == cap(pp.buffer) {
 	// 	return 0, fmt.Errorf("bytebuffer full")
@@ -317,9 +334,12 @@ func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 		pesBytes = append(pesBytes, b)
 	}
 	pesBytes[0].StartOfPacket = sop
+	//fmt.Println("pes packetin")
 	pp.byteIncomingChan <- pesBytes
+	//fmt.Println("pes packetin ok")
+	i++
 	// pp.buffer = append(pp.buffer, pesBytes...)
-	// fmt.Printf("2 %p len: %d cap: %d\n", pp.buffer, len(pp.buffer), cap(pp.buffer))
+	// //fmt.Printf("2 %p len: %d cap: %d\n", pp.buffer, len(pp.buffer), cap(pp.buffer))
 	return len(p), nil
 }
 

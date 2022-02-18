@@ -170,7 +170,6 @@ func (p *Packet) parseHeader() error {
 		if af.SplicingPointFlag {
 			// splice_countdown 8 tcimsbf
 			fmt.Println("[BUG] SplicingPoint parsing is not implemented")
-
 			fmt.Printf("af: %#v\n", af)
 		}
 		if af.TransportPrivateDataFlag {
