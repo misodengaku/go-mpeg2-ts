@@ -43,6 +43,8 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 						break
 					}
 				}
+
+				var packetData []byte
 				if syncIndex == -1 {
 					// tse.buffer is dirty. clear and continue
 					fmt.Println("sync byte is not found in buffer", len(tse.buffer))
@@ -50,8 +52,15 @@ func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
 					continue
 				} else if syncIndex > 0 {
 					fmt.Printf("synced. drop %dbytes\n", syncIndex)
+					tse.dequeueWithoutLock(syncIndex)
+					if len(tse.buffer) >= tse.chunkSize {
+						packetData = tse.dequeueWithoutLock(tse.chunkSize)
+					} else {
+						break
+					}
+				} else {
+					packetData = tse.dequeueWithoutLock(tse.chunkSize)
 				}
-				packetData := tse.dequeueWithoutLock(tse.chunkSize)
 				if packetData == nil {
 					break
 				}
