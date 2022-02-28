@@ -45,7 +45,9 @@ type AdaptationField struct {
 	ExtensionFlag                 bool
 	ProgramClockReference         ProgramClockReference
 	OriginalProgramClockReference ProgramClockReference
+	SpliceCountdown               byte
 	TransportPrivateData          TransportPrivateData
+	ExtensionLength               byte
 	Stuffing                      []byte
 }
 
