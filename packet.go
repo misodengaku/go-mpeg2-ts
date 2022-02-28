@@ -137,6 +137,12 @@ func (p *Packet) parseHeader() error {
 			}
 		}
 
+		if p.AdaptationField.Length == 0 {
+			p.AdaptationField = af
+			p.isHeaderParsed = true
+			return nil
+		}
+
 		af.DiscontinuityIndicator = ((p.Data[5] >> 7) & 0x01) == 1
 		af.RandomAccessIndicator = ((p.Data[5] >> 6) & 0x01) == 1
 		af.ESPriorityIndicator = ((p.Data[5] >> 5) & 0x01) == 1
