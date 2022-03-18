@@ -103,6 +103,9 @@ type ProgramElementDescriptor struct {
 	VideoStreamDescriptor
 	RegistrationDescriptor
 	UserPrivateDescriptor
+	MPEG4VideoDescriptor
+	MPEG4AudioDescriptor
+	AVCVideoDescriptor
 }
 
 type VideoStreamDescriptor struct {
@@ -126,6 +129,33 @@ type UserPrivateDescriptor struct {
 	Data []byte
 }
 
+type MPEG4VideoDescriptor struct {
+	// Rec. ITU-T H.222.0 (06-2021) p.92
+	VisualProfileAndLevel uint8
+}
+
+type MPEG4AudioDescriptor struct {
+	// Rec. ITU-T H.222.0 (06-2021) p.92
+	AudioProfileAndLevel uint8
+}
+
+type AVCVideoDescriptor struct {
+	// Rec. ITU-T H.222.0 (06-2021) pp.105-106
+	ProfileIDC                    uint8
+	ConstraintSet0Flag            bool
+	ConstraintSet1Flag            bool
+	ConstraintSet2Flag            bool
+	ConstraintSet3Flag            bool
+	ConstraintSet4Flag            bool
+	ConstraintSet5Flag            bool
+	AVCCompatibleFlags            uint8
+	LevelIDC                      uint8
+	AVCStillPresent               bool
+	AVC24HourPictureFlag          bool
+	FramePackingSEINotPresentFlag bool
+	Reserved                      uint8
+}
+
 func (p *Packet) ParsePMT() (PMT, error) {
 	pmt := PMT{}
 	payload, err := p.GetPayload()
@@ -133,6 +163,8 @@ func (p *Packet) ParsePMT() (PMT, error) {
 		return PMT{}, err
 	}
 	// fmt.Printf("raw pmt dump %#v\r\n", payload)
+
+	// Rec. ITU-T H.222.0 (06-2021) pp.57-60,p.261
 	pmt.Pointer = payload[0]
 	pmt.TableID = payload[1]                                     // 8
 	pmt.SectionSyntaxIndicator = ((payload[2] >> 7) & 0x01) == 1 // 1
@@ -155,10 +187,14 @@ func (p *Packet) ParsePMT() (PMT, error) {
 
 	// fmt.Printf("pmt %d dump %x table:%x synind:%t len:%d pid:%d pil:%d\r\n", p.Index, pmt.Pointer, pmt.TableID, pmt.SectionSyntaxIndicator, pmt.SectionLength, pmt.PCR_PID, pmt.ProgramInfoLength)
 
-	// fmt.Println("len", (13 + int(pmt.ProgramInfoLength)))
 	var diff int
-	pmt.Descriptors, diff = readDescriptor(payload, 13, int(pmt.ProgramInfoLength))
+	for i := 0; i < int(pmt.ProgramInfoLength); i += diff { // N loop descriptors
+		pmt.Descriptors, diff, err = readDescriptor(payload, index, int(pmt.ProgramInfoLength))
+		if err != nil {
+			return PMT{}, err
+		}
 	index += diff
+	}
 
 	// Stream Descriptor
 	for index < int(pmt.SectionLength) {
@@ -168,9 +204,13 @@ func (p *Packet) ParsePMT() (PMT, error) {
 		si.ElementaryPID = uint16(payload[index+1]&0x1f)<<8 | uint16(payload[index+2]) // 13
 		si.Reserved2 = (payload[index+3] >> 4) & 0x0f                                  // 4
 		si.ESInfoLength = uint16(payload[index+3]&0x0f)<<8 | uint16(payload[index+4])  // 12
-		// fmt.Printf("si: %#v\n", si)
 		index += 5
-		si.Descriptors, diff = readDescriptor(payload, index, int(si.ESInfoLength))
+
+		// N2 loop
+		si.Descriptors, diff, err = readDescriptor(payload, index, int(si.ESInfoLength))
+		if err != nil {
+			return PMT{}, err
+		}
 		pmt.Streams = append(pmt.Streams, si)
 		index += diff
 	}
@@ -187,7 +227,8 @@ func (p *Packet) ParsePMT() (PMT, error) {
 	return pmt, nil
 }
 
-func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDescriptor, int) {
+func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDescriptor, int, error) {
+	// Rec. ITU-T H.222.0 (06-2021) pp.76-156,p.261
 
 	diff := 0
 	peds := []ProgramElementDescriptor{}
@@ -221,36 +262,125 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 			}
 
 		case ped.Tag == 3: //audio_stream_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 4: //hierarchy_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 5: //registration_descriptor
 			ped.RegistrationDescriptor.FormatIdentifier = payload[index+2 : int(ped.Length)+index+2]
 			diff += int(ped.Length)
 		case ped.Tag == 6: //data_stream_alignment_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 7: //target_background_grid_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 8: //Video_window_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 9: //CA_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 10: //ISO_639_language_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 11: //System_clock_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 12: //Multiplex_buffer_utilization_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 13: //Copyright_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 14: // Maximum_bitrate_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 15: //Private_data_indicator_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 16: //Smoothing_buffer_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 1: // STD_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 18: //IBP_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 27: //MPEG-4_video_descriptor
+			ped.MPEG4VideoDescriptor.VisualProfileAndLevel = payload[index+2]
+			diff += 1
 		case ped.Tag == 28: //MPEG-4_audio_descriptor
+			ped.MPEG4AudioDescriptor.AudioProfileAndLevel = payload[index+2]
+			diff += 1
 		case ped.Tag == 29: //IOD_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 30: // SL_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 31: //FMC_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 32: //External_ES_ID_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 33: //MuxCode_descriptor
-		case ped.Tag == 34: //FmxBufferSize_descriptor
-		case ped.Tag == 35: // MultiplexBuffer_descriptor
-
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 34: // FmxBufferSize_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 35: // multiplexBuffer_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 36: // content_labeling_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 37: // metadata_pointer_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 38: // metadata_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 39: // metadata_STD_descripto
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 40: // AVC video descriptor
+			ped.AVCVideoDescriptor.ProfileIDC = payload[index+2]
+			ped.AVCVideoDescriptor.ConstraintSet0Flag = ((payload[index+3] >> 7) & 0x01) == 1
+			ped.AVCVideoDescriptor.ConstraintSet1Flag = ((payload[index+3] >> 6) & 0x01) == 1
+			ped.AVCVideoDescriptor.ConstraintSet2Flag = ((payload[index+3] >> 5) & 0x01) == 1
+			ped.AVCVideoDescriptor.ConstraintSet3Flag = ((payload[index+3] >> 4) & 0x01) == 1
+			ped.AVCVideoDescriptor.ConstraintSet4Flag = ((payload[index+3] >> 3) & 0x01) == 1
+			ped.AVCVideoDescriptor.ConstraintSet5Flag = ((payload[index+3] >> 2) & 0x01) == 1
+			ped.AVCVideoDescriptor.AVCCompatibleFlags = (payload[index+3] & 0x03)
+			ped.AVCVideoDescriptor.LevelIDC = payload[index+4]
+			ped.AVCVideoDescriptor.AVCStillPresent = ((payload[index+5] >> 7) & 0x01) == 1
+			ped.AVCVideoDescriptor.AVC24HourPictureFlag = ((payload[index+5] >> 6) & 0x01) == 1
+			ped.AVCVideoDescriptor.FramePackingSEINotPresentFlag = ((payload[index+5] >> 5) & 0x01) == 1
+			ped.AVCVideoDescriptor.Reserved = (payload[index+5] & 0x1f)
+			diff += 4
+		case ped.Tag == 41: // IPMP_descriptor (defined in ISO/IEC 13818-11, MPEG-2 IPMP)
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 42: // AVC timing and HRD descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 43: // MPEG-2_AAC_audio_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 44: // FlexMuxTiming_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 45: // MPEG-4_text_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 46: // MPEG-4_audio_extension_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 47: // Auxiliary_video_stream_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 48: // SVC extension descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 49: // MVC extension descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 50: // J2K video descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 51: // MVC operation point descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 52: // MPEG2_stereoscopic_video_format_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 53: // Stereoscopic_program_info_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 54: // Stereoscopic_video_info_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 55: // Transport_profile_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 56: // HEVC video descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 57: // VVC video descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag == 58: // EVC video descripto
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 0 || ped.Tag == 1: // reserved
+			return nil, 0, fmt.Errorf("descriptor_tag value(%d) is reserved", ped.Tag)
 		case ped.Tag >= 19 && ped.Tag <= 26: // Defined in ISO/IEC 13818-6
-		case ped.Tag >= 36 && ped.Tag <= 63: // ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Reserved
+			fmt.Println("[WARN] not implemented", ped.Tag)
+		case ped.Tag >= 59 && ped.Tag <= 62: // ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Reserved
+			return nil, 0, fmt.Errorf("descriptor_tag value(%d) is reserved", ped.Tag)
+		case ped.Tag == 63: // Extension_descriptor
+			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag >= 64 && ped.Tag <= 255: //  User Private
 			ped.UserPrivateDescriptor.Data = payload[index+2 : int(ped.Length)+index+2]
 			diff += int(ped.Length)
@@ -260,5 +390,5 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 		index += diff
 		peds = append(peds, ped)
 	}
-	return peds, diff
+	return peds, diff, nil
 }
