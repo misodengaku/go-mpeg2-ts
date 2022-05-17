@@ -124,15 +124,17 @@ type VideoStreamDescriptor struct {
 }
 
 type RegistrationDescriptor struct {
-	FormatIdentifier []byte
+	// Rec. ITU-T H.222.0 (06-2021) pp.81-82
+	FormatIdentifier             []byte
+	AdditionalIdentificationInfo []byte
 }
 
 type ISO639LanguageDescriptor struct {
+	// Rec. ITU-T H.222.0 (06-2021) pp.86-87
 	Languages []ISO639LanguageRelation
 }
 
 type ISO639LanguageRelation struct {
-	// Rec. ITU-T H.222.0 (06-2021) pp.86-87
 	ISO639LanguageCode int   // 24
 	AudioType          uint8 // 8
 }
@@ -278,7 +280,11 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 		case ped.Tag == 4: //hierarchy_descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 5: //registration_descriptor
-			ped.RegistrationDescriptor.FormatIdentifier = payload[index+2 : int(ped.Length)+index+2]
+			ped.RegistrationDescriptor.FormatIdentifier = payload[index+2 : index+6]
+			if ped.Length > 4 {
+				ped.RegistrationDescriptor.AdditionalIdentificationInfo = make([]byte, ped.Length-4)
+				copy(ped.RegistrationDescriptor.AdditionalIdentificationInfo, payload[index+6:index+6+int(ped.Length)-4])
+			}
 			diff += int(ped.Length)
 		case ped.Tag == 6: //data_stream_alignment_descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
