@@ -102,6 +102,7 @@ type ProgramElementDescriptor struct {
 
 	VideoStreamDescriptor
 	RegistrationDescriptor
+	ISO639LanguageDescriptor
 	UserPrivateDescriptor
 	MPEG4VideoDescriptor
 	MPEG4AudioDescriptor
@@ -125,6 +126,17 @@ type VideoStreamDescriptor struct {
 type RegistrationDescriptor struct {
 	FormatIdentifier []byte
 }
+
+type ISO639LanguageDescriptor struct {
+	Languages []ISO639LanguageRelation
+}
+
+type ISO639LanguageRelation struct {
+	// Rec. ITU-T H.222.0 (06-2021) pp.86-87
+	ISO639LanguageCode int   // 24
+	AudioType          uint8 // 8
+}
+
 type UserPrivateDescriptor struct {
 	Data []byte
 }
@@ -277,7 +289,14 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 		case ped.Tag == 9: //CA_descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 10: //ISO_639_language_descriptor
-			fmt.Println("[WARN] not implemented", ped.Tag)
+			ped.ISO639LanguageDescriptor.Languages = make([]ISO639LanguageRelation, ped.Length/4)
+			for i := 0; i < int(ped.Length)/4; i++ {
+				ped.ISO639LanguageDescriptor.Languages[i] = ISO639LanguageRelation{
+					ISO639LanguageCode: int(payload[index+2+(i*4)])<<16 | int(payload[index+2+(i*4)+1])<<8 | int(payload[index+2+(i*4)+2]),
+					AudioType:          payload[index+2+(i*4)+3],
+				}
+			}
+			diff += int(ped.Length)
 		case ped.Tag == 11: //System_clock_descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag == 12: //Multiplex_buffer_utilization_descriptor
