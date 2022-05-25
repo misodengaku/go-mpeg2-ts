@@ -292,8 +292,6 @@ func (pp *PESParser) getBufferLength() int {
 	return l
 }
 
-var i = 0
-
 func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 	var b PESByte
 	pesBytes := make([]PESByte, 0, len(p))
@@ -303,7 +301,6 @@ func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 	}
 	pesBytes[0].StartOfPacket = sop
 	pp.byteIncomingChan <- pesBytes
-	i++
 	return len(p), nil
 }
 
