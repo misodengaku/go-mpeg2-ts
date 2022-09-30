@@ -20,7 +20,7 @@ const (
 	StreamTypeISO13818_6_TypeC           = 0x0C // ISO/IEC 13818-6 type C
 	StreamTypeISO13818_6_TypeD           = 0x0D // ISO/IEC 13818-6 type D
 	StreamTypeISO13818_1_Aux             = 0x0E // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 auxiliary
-	StreamTypeISO13818_7_Audio           = 0x0F // ISO/IEC 13818-7 Audio with ADTS transport syntax
+	StreamTypeISO13818_7_AudioWithADTS   = 0x0F // ISO/IEC 13818-7 Audio with ADTS transport syntax
 	StreamTypeISO14496_2_Visual          = 0x10 // ISO/IEC 14496-2 Visual
 	StreamTypeISO14496_3_AudioWithLATM   = 0x11 // ISO/IEC 14496-3 Audio with the LATM transport syntax as defined in ISO/IEC 14496-3
 	StreamTypeISO14496_1_PES             = 0x12 // ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in PES packets
