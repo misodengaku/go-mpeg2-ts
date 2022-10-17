@@ -82,6 +82,7 @@ type PESParser struct {
 type PESByte struct {
 	Datum         byte
 	StartOfPacket bool
+	EndOfStream   bool
 }
 
 func NewPESParser(bufferSize int) PESParser {
@@ -90,6 +91,10 @@ func NewPESParser(bufferSize int) PESParser {
 	pp.byteIncomingChan = make(chan []PESByte, 1048576)
 	pp.mutex = &sync.Mutex{}
 	return pp
+}
+
+func (pp *PESParser) Close() {
+	close(pp.byteIncomingChan)
 }
 
 func (pp *PESParser) StartPESReadLoop() chan PES {
@@ -292,7 +297,7 @@ func (pp *PESParser) getBufferLength() int {
 	return l
 }
 
-func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
+func (pp *PESParser) WriteBytes(p []byte, sop, eos bool) (n int, err error) {
 	var b PESByte
 	pesBytes := make([]PESByte, 0, len(p))
 	for _, v := range p {
@@ -300,6 +305,7 @@ func (pp *PESParser) WriteBytes(p []byte, sop bool) (n int, err error) {
 		pesBytes = append(pesBytes, b)
 	}
 	pesBytes[0].StartOfPacket = sop
+	pesBytes[len(p)-1].EndOfStream = eos
 	pp.byteIncomingChan <- pesBytes
 	return len(p), nil
 }
@@ -309,6 +315,15 @@ func (pp *PESParser) EnqueueTSPacket(tsPacket Packet) error {
 	if err != nil {
 		return err
 	}
-	_, err = pp.WriteBytes(byteBuffer, tsPacket.PayloadUnitStartIndicator)
+	_, err = pp.WriteBytes(byteBuffer, tsPacket.PayloadUnitStartIndicator, false)
+	return err
+}
+
+func (pp *PESParser) EnqueueLastTSPacket(tsPacket Packet) error {
+	byteBuffer, err := tsPacket.GetPayload()
+	if err != nil {
+		return err
+	}
+	_, err = pp.WriteBytes(byteBuffer, tsPacket.PayloadUnitStartIndicator, true)
 	return err
 }
