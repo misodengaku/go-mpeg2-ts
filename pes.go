@@ -102,33 +102,41 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 	go func(pesOutChan chan PES) {
 		state := 0
 		for w := range pp.byteIncomingChan {
+			// enqueue bytes to parser queue
 			in := make([]PESByte, len(w))
 			copy(in, w)
+			isLast := false
+			for i := 0; i < len(in); i++ {
+				if in[i].EndOfStream {
+					in = in[:i]
+					isLast = true
+				}
+			}
 			pp.enqueue(in)
-			eor := false
-			for pp.getBufferLength() > 0 && !eor {
+		READLOOP:
+			for pp.getBufferLength() > 0 {
 				if state == 0 {
 					if pp.getBufferLength() < 6 {
 						// buffer is too short
-						eor = true
-						break
+						break READLOOP
 					}
+
+					// find prefix bytes
 					prefixIndex := -1
 					for i := 0; i < pp.getBufferLength()-3; i++ {
 						if pp.buffer[i].Datum == 0 && pp.buffer[i+1].Datum == 0 && pp.buffer[i+2].Datum == 1 {
 							prefixIndex = i
-							eor = true
 							break
 						}
 					}
 					if prefixIndex == -1 {
 						// sync byte is not found
 						pp.dequeue(pp.getBufferLength())
-						eor = true
-						break
+						break READLOOP
 					} else {
 						pp.dequeue(prefixIndex)
 					}
+
 					pp.PES.Prefix = uint32(pp.buffer[0].Datum)<<16 | uint32(pp.buffer[1].Datum)<<8 | uint32(pp.buffer[2].Datum)
 					pp.PES.StreamID = pp.buffer[3].Datum
 					pp.PES.PacketLength = uint16(pp.buffer[4].Datum)<<8 | uint16(pp.buffer[5].Datum)
@@ -140,8 +148,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 				if state == 1 {
 					if pp.getBufferLength() < 13 {
 						// buffer is too short
-						eor = true
-						break
+						break READLOOP
 					}
 					switch pp.PES.StreamID {
 					default:
@@ -149,8 +156,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 							// invalid. reset
 							pp.dequeue(1)
 							state = 0
-							eor = true
-							break
+							break READLOOP
 						}
 
 						pp.PES.ScramblingControl = (pp.buffer[0].Datum >> 4) & 0x03
@@ -218,8 +224,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					// read payload
 					if pp.getBufferLength() == 0 {
 						// buffer is empty
-						eor = true
-						break
+						break READLOOP
 					}
 					writtenBytes := 0
 
@@ -227,7 +232,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					for _, v := range pp.buffer {
 						if v.StartOfPacket {
 							pr := pp.PES.DeepCopy()
-							pc <- pr
+							pesOutChan <- pr
 							pp.PES = PES{}
 							state = 0
 							break
@@ -242,8 +247,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 				if state == 3 {
 					if pp.getBufferLength() < int(pp.PES.PacketLength) {
 						// buffer is too short
-						eor = true
-						break
+						break READLOOP
 					}
 					pp.PES.PacketDataStream = make([]byte, pp.PES.PacketLength)
 
@@ -260,8 +264,7 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 				if state == 4 {
 					if pp.getBufferLength() > int(pp.PES.PacketLength) {
 						// buffer is too short
-						eor = true
-						break
+						break READLOOP
 					}
 					pp.PES.Padding = make([]byte, pp.PES.PacketLength)
 					pp.mutex.Lock()
@@ -272,7 +275,12 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					pp.dequeue(int(pp.PES.PacketLength))
 					state = 0
 				}
-
+			}
+			if isLast {
+				fmt.Println("exit")
+				close(pesOutChan)
+				close(pp.byteIncomingChan)
+				return
 			}
 		}
 	}(pc)
