@@ -61,7 +61,8 @@ const (
 	// StreamType       = 0x35 // EVC video stream or an EVC temporal video sub-bitstream conforming to one or more profiles defined in ISO/IEC 23094-1
 	// StreamType       = 0x36 // .. 0x7E Rec. ITU-T H.222.0 | ISO/IEC 13818-1 reserved
 	// StreamType       = 0x7F // IPMP stream
-	// StreamType       = 0x80 // .. 0xFF User Private
+	StreamTypeUserPrivateMin = 0x80
+	StreamTypeUserPrivateMax = 0xFF
 )
 
 // Program Map Table
@@ -94,6 +95,10 @@ type StreamInfo struct {
 	Reserved2     byte
 	ESInfoLength  uint16
 	Descriptors   []ProgramElementDescriptor
+}
+
+func (s *StreamInfo) IsUserPrivateStream() bool {
+	return s.Type >= StreamTypeUserPrivateMin && s.Type <= StreamTypeUserPrivateMax
 }
 
 type ProgramElementDescriptor struct {
