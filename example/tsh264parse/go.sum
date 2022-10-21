@@ -1,4 +1,4 @@
 github.com/misodengaku/go-h264-parse v0.0.0-20221017135620-695c0f8c2304 h1:UY6XmAyGG+YWcjXJ/zASiN/jW6WQ8/M0IXd+sJHW+BM=
 github.com/misodengaku/go-h264-parse v0.0.0-20221017135620-695c0f8c2304/go.mod h1:+WRMaTzdpOZd1sLgX7PGhQU+o+4KCgpYh4Z6hpDxzKQ=
-github.com/misodengaku/go-mpeg2-ts v0.0.0-20221017121219-921c5d03cf20 h1:Rp+XilqP9m2WPNJR2ZpMJu3uvcms4HKz+YY3Os0G2aw=
-github.com/misodengaku/go-mpeg2-ts v0.0.0-20221017121219-921c5d03cf20/go.mod h1:d+Bo+GHiIUJESIegwArJDWPT7ZPfW24HkGFmhtRpFrQ=
+github.com/misodengaku/go-mpeg2-ts v0.0.0-20221021075715-1b2657c11816 h1:NhJ0Qdr4yNj0qEBArYgOSI8NRTkaHBoTVpukyKZJoto=
+github.com/misodengaku/go-mpeg2-ts v0.0.0-20221021075715-1b2657c11816/go.mod h1:d+Bo+GHiIUJESIegwArJDWPT7ZPfW24HkGFmhtRpFrQ=
