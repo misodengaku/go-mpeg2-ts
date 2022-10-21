@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
@@ -37,7 +38,8 @@ func main() {
 		panic(err)
 	}
 	udpSenderConn.SetWriteBuffer(8 * 1048576)
-	pesChan := pesParser.StartPESReadLoop()
+	ctx := context.Background()
+	pesChan := pesParser.StartPESReadLoop(ctx)
 	go func() {
 		// PES receiver
 		for {

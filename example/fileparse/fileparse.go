@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"time"
+	"sync"
 
 	mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
 )
@@ -64,31 +65,38 @@ func main() {
 	fmt.Printf("Video Stream PID is 0x%04X. start PES dump\n", elementaryPID)
 	pesPackets := mpeg2.FilterByPIDs(elementaryPID)
 	pesParser := mpeg2ts.NewPESParser(8 * 1048576)
-	pesChan := pesParser.StartPESReadLoop()
+
+	ctx := context.Background()
+	c := pesParser.StartPESReadLoop(ctx)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
 		i := 0
-		for {
-			p := <-pesChan
-			go func(index int, pes mpeg2ts.PES) {
+		for p := range c {
+			fmt.Printf("ES frame: %dbytes\n", len(p.ElementaryStream))
+			if enableESDump {
+				fname := fmt.Sprintf("output/es_%04d.bin", i)
+				os.WriteFile(fname, p.ElementaryStream, 0644)
+			}
 
-				fmt.Printf("ES frame: %dbytes\n", len(p.ElementaryStream))
-				if enableESDump {
-					fname := fmt.Sprintf("es_%04d.bin", i)
-					os.WriteFile(fname, p.ElementaryStream, 0644)
-				}
-			}(i, p)
 			i++
 		}
+		wg.Done()
 	}()
+
 	packets := pesPackets.PacketList.All()
-	for _, p := range packets {
-		err = pesParser.EnqueueTSPacket(p)
+	for i, p := range packets {
+		if i < len(packets)-1 {
+			err = pesParser.EnqueueTSPacket(p)
+		} else {
+			err = pesParser.EnqueueLastTSPacket(p)
+		}
 		if err != nil {
 			panic(err)
 		}
 	}
+	wg.Wait()
 
-	time.Sleep(400 * time.Millisecond) // (loosely) wait for output ES frame
 	checkContinuity()
 }
 

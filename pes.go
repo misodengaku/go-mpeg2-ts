@@ -1,6 +1,7 @@
 package mpeg2ts
 
 import (
+	"context"
 	"fmt"
 	"sync"
 )
@@ -93,11 +94,7 @@ func NewPESParser(bufferSize int) PESParser {
 	return pp
 }
 
-func (pp *PESParser) Close() {
-	close(pp.byteIncomingChan)
-}
-
-func (pp *PESParser) StartPESReadLoop() chan PES {
+func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
 	pc := make(chan PES)
 	go func(pesOutChan chan PES) {
 		state := 0
@@ -276,11 +273,19 @@ func (pp *PESParser) StartPESReadLoop() chan PES {
 					state = 0
 				}
 			}
-			if isLast {
-				fmt.Println("exit")
+			select {
+			case <-ctx.Done():
+				// fmt.Println("exit")
 				close(pesOutChan)
 				close(pp.byteIncomingChan)
 				return
+			default:
+				if isLast {
+					// fmt.Println("last packet received")
+					close(pesOutChan)
+					close(pp.byteIncomingChan)
+					return
+				}
 			}
 		}
 	}(pc)

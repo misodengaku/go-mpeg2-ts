@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -66,7 +67,8 @@ func main() {
 	pesPackets := mpeg2.FilterByPIDs(elementaryPID)
 	pesParser := mpeg2ts.NewPESParser(8 * 1048576)
 
-	c := pesParser.StartPESReadLoop()
+	ctx := context.Background()
+	c := pesParser.StartPESReadLoop(ctx)
 	nalus := h264parse.NALUs{}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
