@@ -35,6 +35,10 @@ const (
 	ScramblingControl_UserDefined3 = 0x03
 )
 
+var (
+	ErrAlreadyClosed = fmt.Errorf("PESParser is already closed")
+)
+
 // Packetized Elementary Stream
 // Rec. ITU-T H.222.0 (06/2021) pp.39-52
 type PES struct {
@@ -77,6 +81,8 @@ type PESParser struct {
 	bufferSize       int
 	byteIncomingChan chan []PESByte
 	mutex            *sync.Mutex
+	isClosed         bool
+	statusMutex      *sync.Mutex
 	PES
 }
 
@@ -90,7 +96,10 @@ func NewPESParser(bufferSize int) PESParser {
 	pp := PESParser{packetCount: 0, bufferSize: bufferSize}
 	pp.buffer = make([]PESByte, 0, pp.bufferSize)
 	pp.byteIncomingChan = make(chan []PESByte, 1048576)
+
 	pp.mutex = &sync.Mutex{}
+	pp.statusMutex = &sync.Mutex{}
+	pp.isClosed = false
 	return pp
 }
 
@@ -98,7 +107,12 @@ func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
 	pc := make(chan PES)
 	go func(pesOutChan chan PES) {
 		state := 0
-		for w := range pp.byteIncomingChan {
+		for {
+			w, ok := <-pp.byteIncomingChan
+			if !ok {
+				return
+			}
+
 			// enqueue bytes to parser queue
 			in := make([]PESByte, len(w))
 			copy(in, w)
@@ -277,19 +291,31 @@ func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
 			case <-ctx.Done():
 				// fmt.Println("exit")
 				close(pesOutChan)
-				close(pp.byteIncomingChan)
 				return
 			default:
 				if isLast {
 					// fmt.Println("last packet received")
 					close(pesOutChan)
-					close(pp.byteIncomingChan)
 					return
 				}
 			}
 		}
 	}(pc)
 	return pc
+}
+
+func (pp *PESParser) Close() {
+	if pp.statusMutex == nil {
+		return
+	}
+	pp.statusMutex.Lock()
+	defer pp.statusMutex.Unlock()
+	if pp.isClosed {
+		return
+	}
+
+	close(pp.byteIncomingChan)
+	pp.isClosed = true
 }
 
 func (pp *PESParser) dequeue(size int) []PESByte {
@@ -311,6 +337,12 @@ func (pp *PESParser) getBufferLength() int {
 }
 
 func (pp *PESParser) WriteBytes(p []byte, sop, eos bool) (n int, err error) {
+	pp.statusMutex.Lock()
+	if pp.isClosed {
+		return 0, ErrAlreadyClosed
+	}
+	defer pp.statusMutex.Unlock()
+
 	var b PESByte
 	pesBytes := make([]PESByte, 0, len(p))
 	for _, v := range p {
