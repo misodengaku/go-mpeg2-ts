@@ -212,7 +212,7 @@ func (p *Packet) ParsePMT() (PMT, error) {
 		if err != nil {
 			return PMT{}, err
 		}
-	index += diff
+		index += diff
 	}
 
 	// Stream Descriptor

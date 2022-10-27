@@ -95,7 +95,7 @@ type PESByte struct {
 func NewPESParser(bufferSize int) PESParser {
 	pp := PESParser{packetCount: 0, bufferSize: bufferSize}
 	pp.buffer = make([]PESByte, 0, pp.bufferSize)
-	pp.byteIncomingChan = make(chan []PESByte, 1048576)
+	pp.byteIncomingChan = make(chan []PESByte, 128*1024)
 
 	pp.mutex = &sync.Mutex{}
 	pp.statusMutex = &sync.Mutex{}
@@ -104,7 +104,7 @@ func NewPESParser(bufferSize int) PESParser {
 }
 
 func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
-	pc := make(chan PES)
+	pc := make(chan PES, 16)
 	go func(pesOutChan chan PES) {
 		state := 0
 		for {
@@ -137,6 +137,7 @@ func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
 					for i := 0; i < pp.getBufferLength()-3; i++ {
 						if pp.buffer[i].Datum == 0 && pp.buffer[i+1].Datum == 0 && pp.buffer[i+2].Datum == 1 {
 							prefixIndex = i
+							pp.dequeue(prefixIndex)
 							break
 						}
 					}
@@ -144,8 +145,6 @@ func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
 						// sync byte is not found
 						pp.dequeue(pp.getBufferLength())
 						break READLOOP
-					} else {
-						pp.dequeue(prefixIndex)
 					}
 
 					pp.PES.Prefix = uint32(pp.buffer[0].Datum)<<16 | uint32(pp.buffer[1].Datum)<<8 | uint32(pp.buffer[2].Datum)
@@ -319,9 +318,9 @@ func (pp *PESParser) Close() {
 }
 
 func (pp *PESParser) dequeue(size int) []PESByte {
-	var r []PESByte
+	r := make([]PESByte, size)
 	if size > 0 {
-		r = pp.buffer[:size]
+		copy(r, pp.buffer[:size])
 		pp.buffer = append(pp.buffer[:0], pp.buffer[size:]...)
 	}
 	return r

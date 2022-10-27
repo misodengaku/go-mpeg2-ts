@@ -98,7 +98,9 @@ func (tse *TransportStreamEngine) dequeue(size int) []byte {
 }
 
 func (tse *TransportStreamEngine) enqueueWithoutLock(in []byte) {
-	tse.buffer = append(tse.buffer, in...)
+	v := make([]byte, len(in))
+	copy(v, in)
+	tse.buffer = append(tse.buffer, v...)
 }
 
 func (tse *TransportStreamEngine) enqueue(in []byte) {
