@@ -26,7 +26,7 @@ func InitTSEngine(chunkSize, bufferSize int) (TransportStreamEngine, error) {
 	return tse, nil
 }
 
-func (tse *TransportStreamEngine) StartPacketReadLoop() chan Packet {
+func (tse *TransportStreamEngine) StartPacketReadLoop() <-chan Packet {
 	cp := make(chan Packet)
 	go func(packetOutChan chan Packet) {
 		for {
