@@ -83,6 +83,7 @@ type PESParser struct {
 	mutex            *sync.Mutex
 	isClosed         bool
 	statusMutex      *sync.Mutex
+	ctx              context.Context
 	PES
 }
 
@@ -92,7 +93,7 @@ type PESByte struct {
 	EndOfStream   bool
 }
 
-func NewPESParser(bufferSize int) PESParser {
+func NewPESParser(ctx context.Context, bufferSize int) PESParser {
 	pp := PESParser{packetCount: 0, bufferSize: bufferSize}
 	pp.buffer = make([]PESByte, 0, pp.bufferSize)
 	pp.byteIncomingChan = make(chan []PESByte, 128*1024)
@@ -100,22 +101,31 @@ func NewPESParser(bufferSize int) PESParser {
 	pp.mutex = &sync.Mutex{}
 	pp.statusMutex = &sync.Mutex{}
 	pp.isClosed = false
+	pp.ctx = ctx
 	return pp
 }
 
-func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
+func (pp *PESParser) StartPESReadLoop() <-chan PES {
 	pc := make(chan PES, 16)
 	go func(pesOutChan chan PES) {
 		state := 0
 		for {
-			w, ok := <-pp.byteIncomingChan
-			if !ok {
+			var in []PESByte
+			select {
+			case <-pp.ctx.Done():
+				// fmt.Println("exit")
+				close(pesOutChan)
 				return
+			default:
+			case w, ok := <-pp.byteIncomingChan:
+				if !ok {
+					return
+				}
+				// enqueue bytes to parser queue
+				in = make([]PESByte, len(w))
+				copy(in, w)
 			}
 
-			// enqueue bytes to parser queue
-			in := make([]PESByte, len(w))
-			copy(in, w)
 			isLast := false
 			for i := 0; i < len(in); i++ {
 				if in[i].EndOfStream {
@@ -286,17 +296,10 @@ func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
 					state = 0
 				}
 			}
-			select {
-			case <-ctx.Done():
-				// fmt.Println("exit")
+			if isLast {
+				// fmt.Println("last packet received")
 				close(pesOutChan)
 				return
-			default:
-				if isLast {
-					// fmt.Println("last packet received")
-					close(pesOutChan)
-					return
-				}
 			}
 		}
 	}(pc)
