@@ -1,6 +1,7 @@
 package mpeg2ts
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -26,10 +27,17 @@ func InitTSEngine(chunkSize, bufferSize int) (TransportStreamEngine, error) {
 	return tse, nil
 }
 
-func (tse *TransportStreamEngine) StartPacketReadLoop() <-chan Packet {
+func (tse *TransportStreamEngine) StartPacketReadLoop(ctx context.Context) <-chan Packet {
 	cp := make(chan Packet)
 	go func(packetOutChan chan Packet) {
 		for {
+			select {
+			case <-ctx.Done():
+				close(packetOutChan)
+				return
+			default:
+				// pass
+			}
 			if tse.getBufferLength() < tse.chunkSize {
 				time.Sleep(1 * time.Millisecond)
 				continue
