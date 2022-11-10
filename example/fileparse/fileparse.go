@@ -62,18 +62,18 @@ func main() {
 		}
 	}
 
+	ctx := context.Background()
 	fmt.Printf("Video Stream PID is 0x%04X. start PES dump\n", elementaryPID)
 	pesPackets := mpeg2.FilterByPIDs(elementaryPID)
-	pesParser := mpeg2ts.NewPESParser(8 * 1048576)
+	pesParser := mpeg2ts.NewPESParser(ctx, 1500)
 
-	ctx := context.Background()
-	c := pesParser.StartPESReadLoop(ctx)
+	c := pesParser.StartPESReadLoop()
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		i := 0
 		for p := range c {
-			fmt.Printf("ES frame: %dbytes\n", len(p.ElementaryStream))
+			fmt.Printf("%d: ES frame: %dbytes\n", i, len(p.ElementaryStream))
 			if enableESDump {
 				fname := fmt.Sprintf("output/es_%04d.bin", i)
 				os.WriteFile(fname, p.ElementaryStream, 0644)

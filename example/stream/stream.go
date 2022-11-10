@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"errors"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -12,56 +15,49 @@ import (
 	mpeg2ts "github.com/misodengaku/go-mpeg2-ts"
 )
 
+const fromUDP = false
+
+var (
+	udpInCount    = uint32(0)
+	pesOutCount   = uint32(0)
+	inBuffer      []byte
+	inBufferMutex *sync.Mutex
+)
+
 func main() {
-	tse, _ := mpeg2ts.InitTSEngine(mpeg2ts.PacketSizeDefault, 10*1048576)
-	tsPacketChan := tse.StartPacketReadLoop()
-	pesParser := mpeg2ts.NewPESParser(1048576)
+	ctx, cancel := context.WithCancel(context.Background())
+	inBuffer = make([]byte, 0, 16*1048576)
+	tse, _ := mpeg2ts.InitTSEngine(mpeg2ts.PacketSizeDefault, 1024)
+	tsPacketChan := tse.StartPacketReadLoop(ctx)
+	pesParser := mpeg2ts.NewPESParser(ctx, 1500)
 
-	pesOutCount := uint32(0)
-	udpInCount := uint32(0)
+	inBufferMutex = &sync.Mutex{}
 
-	m := sync.Mutex{}
-	udpBuffer := make([]byte, 0, 16*1048576)
-
-	log.Println("Starting udp server...")
-	udpConn, err := net.ListenPacket("udp", "0.0.0.0:50000")
-	if err != nil {
-		panic(err)
+	if fromUDP {
+		go startUDPSrc(ctx)
+	} else {
+		go func() {
+			err := startFileSrc(ctx, "test.ts", 1000*1000)
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					panic(err)
+				}
+				// error is EOF. cancel only
+			}
+			cancel()
+		}()
 	}
 
-	udpAddr := &net.UDPAddr{
-		IP:   net.ParseIP("127.0.0.1"),
-		Port: 5000,
-	}
-	udpSenderConn, err := net.DialUDP("udp", nil, udpAddr)
-	if err != nil {
-		panic(err)
-	}
-	udpSenderConn.SetWriteBuffer(8 * 1048576)
-	ctx := context.Background()
-	pesChan := pesParser.StartPESReadLoop(ctx)
+	pesChan := pesParser.StartPESReadLoop()
 	go func() {
 		// PES receiver
 		for {
-			pes := <-pesChan
-			atomic.AddUint32(&pesOutCount, uint32(len(pes.ElementaryStream)))
-		}
-	}()
-
-	go func() {
-		// receive UDP packet, and store to receive buffer
-		buf := [1500]byte{}
-		for {
-			n, _, err := udpConn.ReadFrom(buf[:])
-			if err != nil {
-				log.Fatalln(err)
-				os.Exit(1)
-			}
-			if n > 0 {
-				m.Lock()
-				udpBuffer = append(udpBuffer, buf[:n]...)
-				atomic.AddUint32(&udpInCount, uint32(n))
-				m.Unlock()
+			select {
+			case pes := <-pesChan:
+				atomic.AddUint32(&pesOutCount, uint32(len(pes.ElementaryStream)))
+			case <-ctx.Done():
+				log.Println("PES receiver exit")
+				return
 			}
 		}
 	}()
@@ -74,20 +70,28 @@ func main() {
 	stateChanged := true
 	bufTicker := time.NewTicker(27 * time.Millisecond)
 	statTicker := time.NewTicker(1 * time.Second)
+	go func() {
+		for {
+			<-bufTicker.C
+			inBufferMutex.Lock()
+			tse.Write(inBuffer)
+			inBuffer = inBuffer[:0]
+			inBufferMutex.Unlock()
+		}
+	}()
+Loop:
 	for {
 		select {
-		case <-bufTicker.C:
-			m.Lock()
-			tse.Write(udpBuffer)
-			udpBuffer = udpBuffer[:0]
-			m.Unlock()
 		case <-statTicker.C:
 			log.Println("-------------------")
 			old := atomic.SwapUint32(&pesOutCount, 0)
-			log.Printf("pesrate %dKbps\n", old/1024*8)
+			log.Printf("pesrate %dKbps frame:%d\n", old/1024*8, frameIndex)
 			old = atomic.SwapUint32(&udpInCount, 0)
-			log.Printf("udprate %dKbps\n", old/1024*8)
-		case v := <-tsPacketChan:
+			log.Printf("incoming rate %dKbps\n", old/1024*8)
+		case v, ok := <-tsPacketChan:
+			if !ok {
+				log.Fatal("tsPacketChan is closed!")
+			}
 			if stateChanged {
 				log.Printf("state %d, PID=%04X\n", state, v.PID)
 				stateChanged = false
@@ -107,6 +111,7 @@ func main() {
 						pmtPID = int(program.ProgramMapPID)
 						state = 1
 						stateChanged = true
+						break
 					}
 				}
 			} else if state == 1 && v.PID == uint16(pmtPID) {
@@ -114,8 +119,8 @@ func main() {
 
 				pmt, err := v.ParsePMT()
 				if err != nil {
-					log.Fatalln(err)
-					os.Exit(1)
+					log.Println("invalid PMT!", err)
+					// continue
 				}
 
 				if len(pmt.Streams) > 0 {
@@ -126,10 +131,21 @@ func main() {
 							state = 2
 							stateChanged = true
 							break
+						} else if s.Type == mpeg2ts.StreamTypeISO13818_2_Video {
+							// ISO 13818-2 Video stream found. transition to PES receive state
+							elementaryPID = s.ElementaryPID
+							state = 2
+							stateChanged = true
+							break
 						}
 					}
 				}
 			} else if state == 2 && v.PID == elementaryPID {
+				if stateChanged {
+					log.Printf("state %d, PID=%04X\n", state, v.PID)
+					stateChanged = false
+				}
+
 				// PES receive state
 				pesParser.EnqueueTSPacket(v)
 			}
@@ -138,11 +154,90 @@ func main() {
 			ci, ok := continuityIndexs[v.PID]
 			if ok {
 				if (ci+1)%16 != v.ContinuityCheckIndex {
-					log.Printf("drop frame detected! tsframe: %d PID: %02X expected: %d actual: %d\n", frameIndex, v.PID, (ci+1)%16, v.ContinuityCheckIndex)
+					// log.Printf("drop frame detected! tsframe: %d PID: %02X expected: %d actual: %d\n", frameIndex, v.PID, (ci+1)%16, v.ContinuityCheckIndex)
 				}
 			}
 			continuityIndexs[v.PID] = v.ContinuityCheckIndex
 			frameIndex++
+		case <-ctx.Done():
+			break Loop
 		}
 	}
+	time.Sleep(1 * time.Second)
+	log.Printf("stream is end\n")
+}
+
+func startUDPSrc(ctx context.Context) {
+
+	log.Println("Starting udp server...")
+	udpConn, err := net.ListenPacket("udp", "0.0.0.0:50000")
+	if err != nil {
+		panic(err)
+	}
+
+	udpAddr := &net.UDPAddr{
+		IP:   net.ParseIP("127.0.0.1"),
+		Port: 5000,
+	}
+	udpSenderConn, err := net.DialUDP("udp", nil, udpAddr)
+	if err != nil {
+		panic(err)
+	}
+	udpSenderConn.SetWriteBuffer(8 * 1048576)
+
+	go func() {
+		// receive UDP packet, and store to receive buffer
+		buf := [1500]byte{}
+		for {
+			n, _, err := udpConn.ReadFrom(buf[:])
+			if err != nil {
+				log.Fatalln(err)
+				os.Exit(1)
+			}
+			if n > 0 {
+				inBufferMutex.Lock()
+				inBuffer = append(inBuffer, buf[:n]...)
+				atomic.AddUint32(&udpInCount, uint32(n))
+				inBufferMutex.Unlock()
+			}
+		}
+	}()
+	log.Println("udp server running...")
+	<-ctx.Done()
+}
+
+func startFileSrc(_ctx context.Context, filename string, byterateLimit int) error {
+	log.Printf("Starting file source... (max %dbyte/s)\n", byterateLimit/1000)
+	ctx, cancel := context.WithCancel(_ctx)
+
+	var err error
+	f, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
+	reader := bufio.NewReader(f)
+
+	go func() {
+		// receive UDP packet, and store to receive buffer
+		buf := [1500]byte{}
+		var n int
+		for {
+			n, err = reader.Read(buf[:])
+			if err != nil {
+				cancel()
+				return
+			}
+			if n > 0 {
+				inBufferMutex.Lock()
+				inBuffer = append(inBuffer, buf[:n]...)
+				atomic.AddUint32(&udpInCount, uint32(n))
+				inBufferMutex.Unlock()
+			}
+			time.Sleep(1 * time.Microsecond)
+		}
+	}()
+	log.Println("file src running...")
+	<-ctx.Done()
+	log.Println("file src exited")
+	return err
 }
