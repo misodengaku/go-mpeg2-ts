@@ -290,6 +290,7 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 				ped.RegistrationDescriptor.AdditionalIdentificationInfo = make([]byte, ped.Length-4)
 				copy(ped.RegistrationDescriptor.AdditionalIdentificationInfo, payload[index+6:index+6+int(ped.Length)-4])
 			}
+			diff += int(ped.Length)
 		case ped.Tag == 6: //data_stream_alignment_descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 			diff += int(ped.Length)
