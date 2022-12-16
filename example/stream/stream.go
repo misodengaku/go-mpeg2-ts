@@ -18,10 +18,11 @@ import (
 const fromUDP = false
 
 var (
-	udpInCount    = uint32(0)
-	pesOutCount   = uint32(0)
-	inBuffer      []byte
-	inBufferMutex *sync.Mutex
+	udpInCount      = uint32(0)
+	pesOutCount     = uint32(0)
+	inBuffer        []byte
+	inBufferMutex   *sync.Mutex
+	disableCRCcheck = false
 )
 
 func main() {
@@ -117,7 +118,7 @@ Loop:
 			} else if state == 1 && v.PID == uint16(pmtPID) {
 				// PMT receive state
 
-				pmt, err := v.ParsePMT()
+				pmt, err := v.ParsePMT(disableCRCcheck)
 				if err != nil {
 					log.Println("invalid PMT!", err)
 					// continue

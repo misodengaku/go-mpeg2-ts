@@ -175,7 +175,7 @@ type AVCVideoDescriptor struct {
 	Reserved                      uint8
 }
 
-func (p *Packet) ParsePMT() (PMT, error) {
+func (p *Packet) ParsePMT(disableCRCcheck bool) (PMT, error) {
 	pmt := PMT{}
 	payload, err := p.GetPayload()
 	if err != nil {
@@ -235,14 +235,17 @@ func (p *Packet) ParsePMT() (PMT, error) {
 	}
 	pmt.CRC32 = uint(payload[index])<<24 | uint(payload[index+1])<<16 | uint(payload[index+2])<<8 | uint(payload[index+3])
 	// fmt.Printf("crc: %08x\n", pmt.CRC32)
+	if disableCRCcheck {
+		return pmt, nil
+	}
 
 	crc := calculateCRC(payload[1:pmt.SectionLength])
+	// fmt.Printf("calculated crc: %08x\n", crc)
+	// fmt.Printf("raw bytes: %#v\n", payload[1:pmt.SectionLength])
 
 	if uint32(pmt.CRC32) != crc {
-		// fmt.Printf("CRC error\n")
 		return PMT{}, fmt.Errorf("CRC32 mismatch")
 	}
-	// fmt.Printf("CRC OK\n")
 	return pmt, nil
 }
 

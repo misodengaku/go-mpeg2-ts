@@ -11,6 +11,7 @@ import (
 )
 
 var enableESDump = false
+var disableCRCcheck = false
 
 var mpeg2 *mpeg2ts.MPEG2TS
 
@@ -33,7 +34,7 @@ func main() {
 				programTable := mpeg2.FilterByPIDs(program.ProgramMapPID)
 				for _, pmtPacket := range programTable.PacketList.All() {
 					fmt.Printf("PMT found. Stream lookup\n")
-					pmt, err := pmtPacket.ParsePMT()
+					pmt, err := pmtPacket.ParsePMT(disableCRCcheck)
 					if err != nil {
 						fmt.Printf("ParsePMT failed. %s\n", err.Error())
 					}
