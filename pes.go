@@ -377,6 +377,9 @@ func (pp *PESParser) getBufferLength() int {
 }
 
 func (pp *PESParser) WriteBytes(p []byte, sop, eos bool) (n int, err error) {
+	if pp.statusMutex == nil {
+		return 0, errors.New("PESParser is not initialized")
+	}
 	pp.statusMutex.Lock()
 	if pp.isClosed {
 		return 0, ErrAlreadyClosed
