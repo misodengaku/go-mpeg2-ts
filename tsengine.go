@@ -8,12 +8,11 @@ import (
 )
 
 type TransportStreamEngine struct {
-	buffer           []byte
-	bufferSize       int
-	packets          PacketList
-	chunkSize        int
-	byteIncomingChan chan struct{}
-	mutex            *sync.Mutex
+	buffer     []byte
+	bufferSize int
+	packets    PacketList
+	chunkSize  int
+	mutex      *sync.Mutex
 }
 
 func InitTSEngine(chunkSize, bufferSize int) (TransportStreamEngine, error) {
@@ -22,7 +21,6 @@ func InitTSEngine(chunkSize, bufferSize int) (TransportStreamEngine, error) {
 	tse.buffer = make([]byte, 0, tse.bufferSize)
 	tse.chunkSize = chunkSize
 	tse.packets, _ = NewPacketList(chunkSize)
-	tse.byteIncomingChan = make(chan struct{})
 	tse.mutex = &sync.Mutex{}
 	return tse, nil
 }
