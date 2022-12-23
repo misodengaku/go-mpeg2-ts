@@ -67,7 +67,7 @@ func main() {
 	pmtPID := -1
 	elementaryPID := uint16(0)
 	frameIndex := uint64(0)
-	continuityIndexs := map[uint16]byte{}
+	continuityIndexes := map[uint16]byte{}
 	stateChanged := true
 	bufTicker := time.NewTicker(27 * time.Millisecond)
 	statTicker := time.NewTicker(1 * time.Second)
@@ -152,13 +152,13 @@ Loop:
 			}
 
 			// check packet continuity
-			ci, ok := continuityIndexs[v.PID]
+			ci, ok := continuityIndexes[v.PID]
 			if ok {
 				if (ci+1)%16 != v.ContinuityCheckIndex {
 					// log.Printf("drop frame detected! tsframe: %d PID: %02X expected: %d actual: %d\n", frameIndex, v.PID, (ci+1)%16, v.ContinuityCheckIndex)
 				}
 			}
-			continuityIndexs[v.PID] = v.ContinuityCheckIndex
+			continuityIndexes[v.PID] = v.ContinuityCheckIndex
 			frameIndex++
 		case <-ctx.Done():
 			break Loop

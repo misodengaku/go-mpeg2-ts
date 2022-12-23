@@ -375,7 +375,7 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 		case ped.Tag == 38: // metadata_descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 			diff += int(ped.Length)
-		case ped.Tag == 39: // metadata_STD_descripto
+		case ped.Tag == 39: // metadata_STD_descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 			diff += int(ped.Length)
 		case ped.Tag == 40: // AVC video descriptor
@@ -444,7 +444,7 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 		case ped.Tag == 57: // VVC video descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 			diff += int(ped.Length)
-		case ped.Tag == 58: // EVC video descripto
+		case ped.Tag == 58: // EVC video descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 			diff += int(ped.Length)
 		case ped.Tag == 0:
@@ -460,7 +460,7 @@ func readDescriptor(payload []byte, startIndex, length int) ([]ProgramElementDes
 		case ped.Tag == 63: // Extension_descriptor
 			fmt.Println("[WARN] not implemented", ped.Tag)
 		case ped.Tag >= 64 && ped.Tag <= 255: //  User Private
-			fmt.Printf("[WARN] userprivate descriptor %02X %dbytes\n", ped.Tag, ped.Length)
+			fmt.Printf("[WARN] user-private descriptor %02X %dbytes\n", ped.Tag, ped.Length)
 			ped.UserPrivateDescriptor.Data = payload[index+2 : int(ped.Length)+index+2]
 			diff += int(ped.Length)
 		}

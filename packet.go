@@ -48,7 +48,6 @@ func (ps *PacketList) AddPacket(p Packet) {
 	ps.mutex.Lock()
 	defer ps.mutex.Unlock()
 	ps.packets = append(ps.packets, p)
-	return
 }
 
 func (ps *PacketList) AddBytes(packetBytes []byte, packetSize int) error {
