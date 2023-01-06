@@ -117,7 +117,6 @@ func NewPESParser(ctx context.Context, bufferSize int) PESParser {
 }
 
 func (pp *PESParser) receiveBytes() ([]PESByte, error) {
-	var in []PESByte
 	select {
 	case <-pp.ctx.Done():
 		return nil, ErrCanceled
@@ -126,7 +125,7 @@ func (pp *PESParser) receiveBytes() ([]PESByte, error) {
 			return nil, ErrByteIncomingChanClosed
 		}
 		// enqueue bytes to parser queue
-		in = make([]PESByte, len(w))
+		in := make([]PESByte, len(w))
 		copy(in, w)
 		return in, nil
 	}
@@ -222,13 +221,15 @@ func (pp *PESParser) parseOptionalPESHeaders() {
 func (pp *PESParser) StartPESReadLoop() <-chan PES {
 	pc := make(chan PES, 16)
 	go func(pesOutChan chan<- PES) {
+		defer fmt.Println("StartPESReadLoop goroutine has exited!")
 		state := StateFindPrefix
-		for {
+		for !pp.isClosed {
 			isLast := false
 
 			in, err := pp.receiveBytes()
 			if err != nil {
 				close(pesOutChan)
+				pp.Close()
 				return
 			}
 
@@ -337,6 +338,7 @@ func (pp *PESParser) StartPESReadLoop() <-chan PES {
 			}
 			if isLast {
 				close(pesOutChan)
+				pp.Close()
 				return
 			}
 		}
