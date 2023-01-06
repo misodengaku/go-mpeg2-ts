@@ -67,7 +67,7 @@ func main() {
 	ctx := context.Background()
 	fmt.Printf("Video Stream PID is 0x%04X. start PES dump\n", elementaryPID)
 	pesPackets := mpeg2.FilterByPIDs(elementaryPID)
-	pesParser := mpeg2ts.NewPESParser(ctx, 1500)
+	pesParser := mpeg2ts.NewPESParser(1500)
 
 	c := pesParser.StartPESReadLoop(ctx)
 	nalus := h264parse.NALUs{}

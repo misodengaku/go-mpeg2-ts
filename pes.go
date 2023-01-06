@@ -94,7 +94,6 @@ type PESParser struct {
 	mutex            *sync.Mutex
 	isClosed         bool
 	statusMutex      *sync.Mutex
-	ctx              context.Context
 	PES
 }
 
@@ -104,7 +103,7 @@ type PESByte struct {
 	EndOfStream   bool
 }
 
-func NewPESParser(ctx context.Context, bufferSize int) PESParser {
+func NewPESParser(bufferSize int) PESParser {
 	pp := PESParser{packetCount: 0, bufferSize: bufferSize}
 	pp.buffer = make([]PESByte, 0, pp.bufferSize)
 	pp.byteIncomingChan = make(chan []PESByte, 128*1024)
@@ -112,23 +111,18 @@ func NewPESParser(ctx context.Context, bufferSize int) PESParser {
 	pp.mutex = &sync.Mutex{}
 	pp.statusMutex = &sync.Mutex{}
 	pp.isClosed = false
-	pp.ctx = ctx
 	return pp
 }
 
 func (pp *PESParser) receiveBytes() ([]PESByte, error) {
-	select {
-	case <-pp.ctx.Done():
-		return nil, ErrCanceled
-	case w, ok := <-pp.byteIncomingChan:
-		if !ok {
-			return nil, ErrByteIncomingChanClosed
-		}
-		// enqueue bytes to parser queue
-		in := make([]PESByte, len(w))
-		copy(in, w)
-		return in, nil
+	w, ok := <-pp.byteIncomingChan
+	if !ok {
+		return nil, ErrByteIncomingChanClosed
 	}
+	// enqueue bytes to parser queue
+	in := make([]PESByte, len(w))
+	copy(in, w)
+	return in, nil
 }
 
 func (pp *PESParser) findPrefix() bool {
@@ -218,18 +212,19 @@ func (pp *PESParser) parseOptionalPESHeaders() {
 	pp.dequeue(trimIndex + 1)
 }
 
-func (pp *PESParser) StartPESReadLoop() <-chan PES {
+func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
 	pc := make(chan PES, 16)
 	go func(pesOutChan chan<- PES) {
-		defer fmt.Println("StartPESReadLoop goroutine has exited!")
+		defer func() {
+			close(pesOutChan)
+			pp.Close()
+		}()
 		state := StateFindPrefix
 		for !pp.isClosed {
 			isLast := false
 
 			in, err := pp.receiveBytes()
 			if err != nil {
-				close(pesOutChan)
-				pp.Close()
 				return
 			}
 
@@ -337,8 +332,6 @@ func (pp *PESParser) StartPESReadLoop() <-chan PES {
 				}
 			}
 			if isLast {
-				close(pesOutChan)
-				pp.Close()
 				return
 			}
 		}

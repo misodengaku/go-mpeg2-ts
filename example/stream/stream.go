@@ -30,7 +30,7 @@ func main() {
 	inBuffer = make([]byte, 0, 16*1048576)
 	tse, _ := mpeg2ts.InitTSEngine(mpeg2ts.PacketSizeDefault, 1024)
 	tsPacketChan := tse.StartPacketReadLoop(ctx)
-	pesParser := mpeg2ts.NewPESParser(ctx, 1500)
+	pesParser := mpeg2ts.NewPESParser(1500)
 
 	inBufferMutex = &sync.Mutex{}
 
@@ -49,7 +49,7 @@ func main() {
 		}()
 	}
 
-	pesChan := pesParser.StartPESReadLoop()
+	pesChan := pesParser.StartPESReadLoop(ctx)
 	go func() {
 		// PES receiver
 		for {
