@@ -114,15 +114,21 @@ func NewPESParser(bufferSize int) PESParser {
 	return pp
 }
 
-func (pp *PESParser) receiveBytes() ([]PESByte, error) {
-	w, ok := <-pp.byteIncomingChan
-	if !ok {
-		return nil, ErrByteIncomingChanClosed
+func (pp *PESParser) receiveBytes(ctx context.Context) ([]PESByte, error) {
+	select {
+	case w, ok := <-pp.byteIncomingChan:
+		if !ok {
+			return nil, ErrByteIncomingChanClosed
+		}
+		// enqueue bytes to parser queue
+		in := make([]PESByte, len(w))
+		copy(in, w)
+		return in, nil
+	case <-ctx.Done():
+		fmt.Println("PESParser canceled")
+		pp.Close()
+		return nil, ErrCanceled
 	}
-	// enqueue bytes to parser queue
-	in := make([]PESByte, len(w))
-	copy(in, w)
-	return in, nil
 }
 
 func (pp *PESParser) findPrefix() bool {
@@ -223,7 +229,7 @@ func (pp *PESParser) StartPESReadLoop(ctx context.Context) <-chan PES {
 		for !pp.isClosed {
 			isLast := false
 
-			in, err := pp.receiveBytes()
+			in, err := pp.receiveBytes(ctx)
 			if err != nil {
 				return
 			}
@@ -376,10 +382,10 @@ func (pp *PESParser) WriteBytes(p []byte, sop, eos bool) (n int, err error) {
 		return 0, errors.New("PESParser is not initialized")
 	}
 	pp.statusMutex.Lock()
+	defer pp.statusMutex.Unlock()
 	if pp.isClosed {
 		return 0, ErrAlreadyClosed
 	}
-	defer pp.statusMutex.Unlock()
 
 	var b PESByte
 	pesBytes := make([]PESByte, 0, len(p))
@@ -389,8 +395,13 @@ func (pp *PESParser) WriteBytes(p []byte, sop, eos bool) (n int, err error) {
 	}
 	pesBytes[0].StartOfPacket = sop
 	pesBytes[len(p)-1].EndOfStream = eos
-	pp.byteIncomingChan <- pesBytes
-	return len(p), nil
+	select {
+	case pp.byteIncomingChan <- pesBytes:
+		// ok
+		return len(p), nil
+	default:
+		return 0, errors.New("byteIncomingChan blocked")
+	}
 }
 
 func (pp *PESParser) EnqueueTSPacket(tsPacket Packet) error {
