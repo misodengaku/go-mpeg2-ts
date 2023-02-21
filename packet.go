@@ -117,7 +117,7 @@ func (p *Packet) parseHeader() error {
 	p.TransportErrorIndicator = ((p.Data[1] >> 7) & 0x01) == 1
 	p.PayloadUnitStartIndicator = ((p.Data[1] >> 6) & 0x01) == 1
 	p.TransportPriorityIndicator = ((p.Data[1] >> 5) & 0x01) == 1
-	p.PID = (uint16(p.Data[1])&0x1F)<<8 | uint16(p.Data[2])
+	p.PID = PID((uint16(p.Data[1])&0x1F)<<8 | uint16(p.Data[2]))
 	p.TransportScrambleControl = (p.Data[3] >> 6) & 0x03
 	p.AdaptationFieldControl = (p.Data[3] >> 4) & 0x03
 	p.ContinuityCheckIndex = (p.Data[3] & 0x0F)

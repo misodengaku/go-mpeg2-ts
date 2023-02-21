@@ -21,7 +21,7 @@ type Packet struct {
 	Index                      int
 	Data                       []byte
 	SyncByte                   byte
-	PID                        uint16
+	PID                        PID
 	TransportScrambleControl   byte
 	AdaptationFieldControl     byte
 	TransportErrorIndicator    bool
