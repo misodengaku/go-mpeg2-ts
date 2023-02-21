@@ -4,65 +4,67 @@ import (
 	"fmt"
 )
 
+type StreamType byte
+
 const (
-	StreamTypeReserved                   = 0x00 // ITU-T | ISO/IEC Reserved
-	StreamTypeISO11172_2_Video           = 0x01 // ISO/IEC 11172-2 Video
-	StreamTypeISO13818_2_Video           = 0x02 // Rec. ITU-T H.262 | ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream
-	StreamTypeISO11172_3_Audio           = 0x03 // ISO/IEC 11172-3 Audio
-	StreamTypeISO13818_3_Audio           = 0x04 // ISO/IEC 13818-3 Audio
-	StreamTypeISO13818_1_PrivateSections = 0x05 // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 private_sections
-	StreamTypeISO13818_1_PES             = 0x06 // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 PES packets containing private data
-	StreamTypeISO13522_MHEG              = 0x07 // ISO/IEC 13522 MHEG
-	StreamTypeISO13818_AnnexA            = 0x08 // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 Annex A DSM-CC
-	StreamTypeH222_1                     = 0x09 // Rec. ITU-T H.222.1
-	StreamTypeISO13818_6_TypeA           = 0x0A // ISO/IEC 13818-6 type A
-	StreamTypeISO13818_6_TypeB           = 0x0B // ISO/IEC 13818-6 type B
-	StreamTypeISO13818_6_TypeC           = 0x0C // ISO/IEC 13818-6 type C
-	StreamTypeISO13818_6_TypeD           = 0x0D // ISO/IEC 13818-6 type D
-	StreamTypeISO13818_1_Aux             = 0x0E // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 auxiliary
-	StreamTypeISO13818_7_AudioWithADTS   = 0x0F // ISO/IEC 13818-7 Audio with ADTS transport syntax
-	StreamTypeISO14496_2_Visual          = 0x10 // ISO/IEC 14496-2 Visual
-	StreamTypeISO14496_3_AudioWithLATM   = 0x11 // ISO/IEC 14496-3 Audio with the LATM transport syntax as defined in ISO/IEC 14496-3
-	StreamTypeISO14496_1_PES             = 0x12 // ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in PES packets
-	StreamTypeISO14496_1_Sections        = 0x13 // ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in ISO/IEC 14496_sections
-	StreamTypeISO13818_6_SDP             = 0x14 // ISO/IEC 13818-6 Synchronized Download Protocol
-	StreamTypeMetadataInPES              = 0x15 // Metadata carried in PES packets
-	StreamTypeMetadataInSections         = 0x16 // Metadata carried in metadata_sections
-	StreamTypeMetadataInDataCarousel     = 0x17 // Metadata carried in ISO/IEC 13818-6 Data Carousel
-	StreamTypeMetadataInObjectCarousel   = 0x18 // Metadata carried in ISO/IEC 13818-6 Object Carousel
-	StreamTypeMetadataInSDP              = 0x19 // Metadata carried in ISO/IEC 13818-6 Synchronized Download Protocol
-	StreamTypeIPMP                       = 0x1A // IPMP stream (defined in ISO/IEC 13818-11, MPEG-2 IPMP)
-	StreamTypeAVC                        = 0x1B // AVC video stream conforming to one or more profiles defined in Annex A of Rec. ITU-T H.264 |
-	StreamTypeISO14496_3_Audio           = 0x1C // ISO/IEC 14496-3 Audio, without using any additional transport syntax, such as DST, ALS and SLS
-	StreamTypeISO14496_17_Text           = 0x1D // ISO/IEC 14496-17 Text
-	StreamTypeISO23002_3_AuxVideo        = 0x1E // Auxiliary video stream as defined in ISO/IEC 23002-3
-	StreamTypeISO14496_10_SVC            = 0x1F // SVC video sub-bitstream of an AVC video stream conforming to one or more profiles defined in Annex G of Rec. ITU-T H.264 | ISO/IEC 14496-10
-	StreamTypeISO14496_10_MVC            = 0x20 // MVC video sub-bitstream of an AVC video stream conforming to one or more profiles defined in Annex H of Rec. ITU-T H.264 | ISO/IEC 14496-10
-	// StreamType       = 0x21 // Video stream conforming to one or more profiles as defined in Rec. ITU-T T.800 | ISO/IEC 15444-1
-	// StreamType       = 0x22 // Additional view Rec. ITU-T H.262 | ISO/IEC 13818-2 video stream for service-compatible stereoscopic 3D services (see Notes 3 and 4)
-	// StreamType       = 0x23 // Additional view Rec. ITU-T H.264 | ISO/IEC 14496-10 video stream conforming to one or more profiles defined in Annex A for service-compatible stereoscopic 3D services (see Notes 3 and 4)
-	// StreamType       = 0x24 // Rec. ITU-T H.265 | ISO/IEC 23008-2 video stream or an HEVC temporal video sub-bitstream
-	// StreamType       = 0x25 // HEVC temporal video subset of an HEVC video stream conforming to one or more profiles defined in Annex A of Rec. ITU-T H.265 | ISO/IEC 23008-2
-	// StreamType       = 0x26 // MVCD video sub-bitstream of an AVC video stream conforming to one or more profiles defined in Annex I of Rec. ITU-T H.264 | ISO/IEC 14496-10
-	// StreamType       = 0x27 // Timeline and External Media Information Stream (see Annex U)
-	// StreamType       = 0x28 // HEVC enhancement sub-partition which includes TemporalId 0 of an HEVC video stream where all NALs units contained in the stream conform to one or more profiles defined in Annex G of Rec. ITU-T H.265 | ISO/IEC 23008-2
-	// StreamType       = 0x29 // HEVC temporal enhancement sub-partition of an HEVC video stream where all NAL units contained in the stream conform to one or more profiles defined in Annex G of Rec. ITU-T H.265 | ISO/IEC 23008-2
-	// StreamType       = 0x2A // HEVC enhancement sub-partition which includes TemporalId 0 of an HEVC video stream where all NAL units contained in the stream conform to one or more profiles defined in Annex H of Rec. ITU-T H.265 | ISO/IEC 23008-2
-	// StreamType       = 0x2B // HEVC temporal enhancement sub-partition of an HEVC video stream where all NAL units contained in the stream conform to one or more profiles defined in Annex H of Rec. ITU-T H.265 | ISO/IEC 23008-2
-	// StreamType       = 0x2C // Green access units carried in MPEG-2 sections
-	// StreamType       = 0x2D // ISO/IEC 23008-3 Audio with MHAS transport syntax – main stream
-	// StreamType       = 0x2E // ISO/IEC 23008-3 Audio with MHAS transport syntax – auxiliary stream
-	// StreamType       = 0x2F // Quality access units carried in sections
-	// StreamType       = 0x30 // Media Orchestration Access Units carried in sections
-	// StreamType       = 0x31 // Substream of a Rec. ITU-T H.265 | ISO/IEC 23008 2 video stream that contains a Motion Constrained Tile Set, parameter sets, slice headers or a combination thereof. See 2.17.5.1.
-	// StreamType       = 0x32 // JPEG XS video stream conforming to one or more profiles as defined in ISO/IEC 21122-2
-	// StreamType       = 0x33 // VVC video stream or a VVC temporal video sub-bitstream conforming to one or more profiles defined in Annex A of Rec. ITU-T H.266 | ISO/IEC 23090-3
-	// StreamType       = 0x34 // VVC temporal video subset of a VVC video stream conforming to one or more profiles defined in Annex A of Rec. ITU-T H.266 | ISO/IEC 23090-3
-	// StreamType       = 0x35 // EVC video stream or an EVC temporal video sub-bitstream conforming to one or more profiles defined in ISO/IEC 23094-1
-	// StreamType       = 0x36 // .. 0x7E Rec. ITU-T H.222.0 | ISO/IEC 13818-1 reserved
-	// StreamType       = 0x7F // IPMP stream
-	StreamTypeUserPrivateMin = 0x80
-	StreamTypeUserPrivateMax = 0xFF
+	StreamTypeReserved                   = StreamType(0x00) // ITU-T | ISO/IEC Reserved
+	StreamTypeISO11172_2_Video           = StreamType(0x01) // ISO/IEC 11172-2 Video
+	StreamTypeISO13818_2_Video           = StreamType(0x02) // Rec. ITU-T H.262 | ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream
+	StreamTypeISO11172_3_Audio           = StreamType(0x03) // ISO/IEC 11172-3 Audio
+	StreamTypeISO13818_3_Audio           = StreamType(0x04) // ISO/IEC 13818-3 Audio
+	StreamTypeISO13818_1_PrivateSections = StreamType(0x05) // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 private_sections
+	StreamTypeISO13818_1_PES             = StreamType(0x06) // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 PES packets containing private data
+	StreamTypeISO13522_MHEG              = StreamType(0x07) // ISO/IEC 13522 MHEG
+	StreamTypeISO13818_AnnexA            = StreamType(0x08) // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 Annex A DSM-CC
+	StreamTypeH222_1                     = StreamType(0x09) // Rec. ITU-T H.222.1
+	StreamTypeISO13818_6_TypeA           = StreamType(0x0A) // ISO/IEC 13818-6 type A
+	StreamTypeISO13818_6_TypeB           = StreamType(0x0B) // ISO/IEC 13818-6 type B
+	StreamTypeISO13818_6_TypeC           = StreamType(0x0C) // ISO/IEC 13818-6 type C
+	StreamTypeISO13818_6_TypeD           = StreamType(0x0D) // ISO/IEC 13818-6 type D
+	StreamTypeISO13818_1_Aux             = StreamType(0x0E) // Rec. ITU-T H.222.0 | ISO/IEC 13818-1 auxiliary
+	StreamTypeISO13818_7_AudioWithADTS   = StreamType(0x0F) // ISO/IEC 13818-7 Audio with ADTS transport syntax
+	StreamTypeISO14496_2_Visual          = StreamType(0x10) // ISO/IEC 14496-2 Visual
+	StreamTypeISO14496_3_AudioWithLATM   = StreamType(0x11) // ISO/IEC 14496-3 Audio with the LATM transport syntax as defined in ISO/IEC 14496-3
+	StreamTypeISO14496_1_PES             = StreamType(0x12) // ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in PES packets
+	StreamTypeISO14496_1_Sections        = StreamType(0x13) // ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in ISO/IEC 14496_sections
+	StreamTypeISO13818_6_SDP             = StreamType(0x14) // ISO/IEC 13818-6 Synchronized Download Protocol
+	StreamTypeMetadataInPES              = StreamType(0x15) // Metadata carried in PES packets
+	StreamTypeMetadataInSections         = StreamType(0x16) // Metadata carried in metadata_sections
+	StreamTypeMetadataInDataCarousel     = StreamType(0x17) // Metadata carried in ISO/IEC 13818-6 Data Carousel
+	StreamTypeMetadataInObjectCarousel   = StreamType(0x18) // Metadata carried in ISO/IEC 13818-6 Object Carousel
+	StreamTypeMetadataInSDP              = StreamType(0x19) // Metadata carried in ISO/IEC 13818-6 Synchronized Download Protocol
+	StreamTypeIPMP                       = StreamType(0x1A) // IPMP stream (defined in ISO/IEC 13818-11, MPEG-2 IPMP)
+	StreamTypeAVC                        = StreamType(0x1B) // AVC video stream conforming to one or more profiles defined in Annex A of Rec. ITU-T H.264 |
+	StreamTypeISO14496_3_Audio           = StreamType(0x1C) // ISO/IEC 14496-3 Audio, without using any additional transport syntax, such as DST, ALS and SLS
+	StreamTypeISO14496_17_Text           = StreamType(0x1D) // ISO/IEC 14496-17 Text
+	StreamTypeISO23002_3_AuxVideo        = StreamType(0x1E) // Auxiliary video stream as defined in ISO/IEC 23002-3
+	StreamTypeISO14496_10_SVC            = StreamType(0x1F) // SVC video sub-bitstream of an AVC video stream conforming to one or more profiles defined in Annex G of Rec. ITU-T H.264 | ISO/IEC 14496-10
+	StreamTypeISO14496_10_MVC            = StreamType(0x20) // MVC video sub-bitstream of an AVC video stream conforming to one or more profiles defined in Annex H of Rec. ITU-T H.264 | ISO/IEC 14496-10
+	// StreamType       = StreamType(0x21) // Video stream conforming to one or more profiles as defined in Rec. ITU-T T.800 | ISO/IEC 15444-1
+	// StreamType       = StreamType(0x22) // Additional view Rec. ITU-T H.262 | ISO/IEC 13818-2 video stream for service-compatible stereoscopic 3D services (see Notes 3 and 4)
+	// StreamType       = StreamType(0x23) // Additional view Rec. ITU-T H.264 | ISO/IEC 14496-10 video stream conforming to one or more profiles defined in Annex A for service-compatible stereoscopic 3D services (see Notes 3 and 4)
+	// StreamType       = StreamType(0x24) // Rec. ITU-T H.265 | ISO/IEC 23008-2 video stream or an HEVC temporal video sub-bitstream
+	// StreamType       = StreamType(0x25) // HEVC temporal video subset of an HEVC video stream conforming to one or more profiles defined in Annex A of Rec. ITU-T H.265 | ISO/IEC 23008-2
+	// StreamType       = StreamType(0x26) // MVCD video sub-bitstream of an AVC video stream conforming to one or more profiles defined in Annex I of Rec. ITU-T H.264 | ISO/IEC 14496-10
+	// StreamType       = StreamType(0x27) // Timeline and External Media Information Stream (see Annex U)
+	// StreamType       = StreamType(0x28) // HEVC enhancement sub-partition which includes TemporalId 0 of an HEVC video stream where all NALs units contained in the stream conform to one or more profiles defined in Annex G of Rec. ITU-T H.265 | ISO/IEC 23008-2
+	// StreamType       = StreamType(0x29) // HEVC temporal enhancement sub-partition of an HEVC video stream where all NAL units contained in the stream conform to one or more profiles defined in Annex G of Rec. ITU-T H.265 | ISO/IEC 23008-2
+	// StreamType       = StreamType(0x2A) // HEVC enhancement sub-partition which includes TemporalId 0 of an HEVC video stream where all NAL units contained in the stream conform to one or more profiles defined in Annex H of Rec. ITU-T H.265 | ISO/IEC 23008-2
+	// StreamType       = StreamType(0x2B) // HEVC temporal enhancement sub-partition of an HEVC video stream where all NAL units contained in the stream conform to one or more profiles defined in Annex H of Rec. ITU-T H.265 | ISO/IEC 23008-2
+	// StreamType       = StreamType(0x2C) // Green access units carried in MPEG-2 sections
+	// StreamType       = StreamType(0x2D) // ISO/IEC 23008-3 Audio with MHAS transport syntax – main stream
+	// StreamType       = StreamType(0x2E) // ISO/IEC 23008-3 Audio with MHAS transport syntax – auxiliary stream
+	// StreamType       = StreamType(0x2F) // Quality access units carried in sections
+	// StreamType       = StreamType(0x30) // Media Orchestration Access Units carried in sections
+	// StreamType       = StreamType(0x31) // Substream of a Rec. ITU-T H.265 | ISO/IEC 23008 2 video stream that contains a Motion Constrained Tile Set, parameter sets, slice headers or a combination thereof. See 2.17.5.1.
+	// StreamType       = StreamType(0x32) // JPEG XS video stream conforming to one or more profiles as defined in ISO/IEC 21122-2
+	// StreamType       = StreamType(0x33) // VVC video stream or a VVC temporal video sub-bitstream conforming to one or more profiles defined in Annex A of Rec. ITU-T H.266 | ISO/IEC 23090-3
+	// StreamType       = StreamType(0x34) // VVC temporal video subset of a VVC video stream conforming to one or more profiles defined in Annex A of Rec. ITU-T H.266 | ISO/IEC 23090-3
+	// StreamType       = StreamType(0x35) // EVC video stream or an EVC temporal video sub-bitstream conforming to one or more profiles defined in ISO/IEC 23094-1
+	// StreamType       = StreamType(0x36) // .. 0x7E Rec. ITU-T H.222.0 | ISO/IEC 13818-1 reserved
+	// StreamType       = StreamType(0x7F) // IPMP stream
+	StreamTypeUserPrivateMin = StreamType(0x80)
+	StreamTypeUserPrivateMax = StreamType(0xFF)
 )
 
 // Program Map Table
@@ -89,7 +91,7 @@ type PMT struct {
 }
 
 type StreamInfo struct {
-	Type          byte
+	Type          StreamType
 	Reserved1     byte
 	ElementaryPID uint16
 	Reserved2     byte
@@ -218,7 +220,7 @@ func (p *Packet) ParsePMT(disableCRCcheck bool) (PMT, error) {
 	// Stream Descriptor
 	for index < int(pmt.SectionLength) {
 		si := StreamInfo{}
-		si.Type = payload[index]                                                       // 8
+		si.Type = StreamType(payload[index])                                           // 8
 		si.Reserved1 = (payload[index+1] >> 5) & 0x07                                  // 3
 		si.ElementaryPID = uint16(payload[index+1]&0x1f)<<8 | uint16(payload[index+2]) // 13
 		si.Reserved2 = (payload[index+3] >> 4) & 0x0f                                  // 4
