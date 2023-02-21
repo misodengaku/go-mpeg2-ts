@@ -24,8 +24,8 @@ type PAT struct {
 type PATProgram struct {
 	ProgramNumber uint16
 	Reserved      int
-	NetworkPID    uint16
-	ProgramMapPID uint16
+	NetworkPID    PID
+	ProgramMapPID PID
 }
 
 func (p *Packet) ParsePAT() (PAT, error) {
@@ -52,9 +52,9 @@ func (p *Packet) ParsePAT() (PAT, error) {
 		base := 9 + i*4
 		pat.Programs[i].ProgramNumber = uint16(payload[base])<<8 | uint16(payload[base+1])
 		if pat.Programs[i].ProgramNumber == 0x0000 {
-			pat.Programs[i].NetworkPID = uint16(payload[base+2]&0x1f)<<8 | uint16(payload[base+3])&0x1fff
+			pat.Programs[i].NetworkPID = PID(uint16(payload[base+2]&0x1f)<<8 | uint16(payload[base+3])&0x1fff)
 		} else {
-			pat.Programs[i].ProgramMapPID = uint16(payload[base+2]&0x1f)<<8 | uint16(payload[base+3])&0x1fff
+			pat.Programs[i].ProgramMapPID = PID(uint16(payload[base+2]&0x1f)<<8 | uint16(payload[base+3])&0x1fff)
 		}
 	}
 	pat.CRC32 = uint(payload[pat.SectionLength])<<24 | uint(payload[pat.SectionLength+1])<<16 | uint(payload[pat.SectionLength+2])<<8 | uint(payload[pat.SectionLength+3])

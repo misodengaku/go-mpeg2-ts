@@ -67,11 +67,11 @@ func loadFile(fname string, packetLength int) (*MPEG2TS, error) {
 
 func (m MPEG2TS) CheckStream() StreamCheckResult {
 	cr := StreamCheckResult{}
-	ci := map[uint16]byte{}
+	ci := map[PID]byte{}
 	dc := 0
 
 	for i := uint16(0); i < 0x2000; i++ {
-		ci[i] = byte(16)
+		ci[PID(i)] = byte(16)
 	}
 
 	for i, p := range m.PacketList.All() {
@@ -116,7 +116,7 @@ func (m MPEG2TS) CheckStream() StreamCheckResult {
 	return cr
 }
 
-func (m *MPEG2TS) FilterByPIDs(pids ...uint16) *MPEG2TS {
+func (m *MPEG2TS) FilterByPIDs(pids ...PID) *MPEG2TS {
 	mx := New(m.chunkSize)
 	for _, p := range m.PacketList.All() {
 		for _, id := range pids {

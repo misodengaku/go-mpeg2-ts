@@ -82,7 +82,7 @@ type PMT struct {
 	SectionNumber          byte
 	LastSectionNumber      byte
 	Reserved3              byte
-	PCR_PID                uint16
+	PCR_PID                PID
 	Reserved4              byte
 	ProgramInfoLength      uint16
 	Descriptors            []ProgramElementDescriptor
@@ -93,7 +93,7 @@ type PMT struct {
 type StreamInfo struct {
 	Type          StreamType
 	Reserved1     byte
-	ElementaryPID uint16
+	ElementaryPID PID
 	Reserved2     byte
 	ESInfoLength  uint16
 	Descriptors   []ProgramElementDescriptor
@@ -201,7 +201,7 @@ func (p *Packet) ParsePMT(disableCRCcheck bool) (PMT, error) {
 	pmt.SectionNumber = payload[7]                                      // 8
 	pmt.LastSectionNumber = payload[8]                                  // 8
 	pmt.Reserved3 = (payload[9] >> 5) & 0x07                            // 3
-	pmt.PCR_PID = uint16(payload[9]&0x1f)<<8 | uint16(payload[10])      // 13
+	pmt.PCR_PID = PID(uint16(payload[9]&0x1f)<<8 | uint16(payload[10])) // 13
 	pmt.Reserved4 = (payload[11] >> 4) & 0x0f                           // 4
 	pmt.ProgramInfoLength = uint16(payload[11]&0x0F)<<8 | uint16(payload[12])
 	index := 13
@@ -220,11 +220,11 @@ func (p *Packet) ParsePMT(disableCRCcheck bool) (PMT, error) {
 	// Stream Descriptor
 	for index < int(pmt.SectionLength) {
 		si := StreamInfo{}
-		si.Type = StreamType(payload[index])                                           // 8
-		si.Reserved1 = (payload[index+1] >> 5) & 0x07                                  // 3
-		si.ElementaryPID = uint16(payload[index+1]&0x1f)<<8 | uint16(payload[index+2]) // 13
-		si.Reserved2 = (payload[index+3] >> 4) & 0x0f                                  // 4
-		si.ESInfoLength = uint16(payload[index+3]&0x0f)<<8 | uint16(payload[index+4])  // 12
+		si.Type = StreamType(payload[index])                                                // 8
+		si.Reserved1 = (payload[index+1] >> 5) & 0x07                                       // 3
+		si.ElementaryPID = PID(uint16(payload[index+1]&0x1f)<<8 | uint16(payload[index+2])) // 13
+		si.Reserved2 = (payload[index+3] >> 4) & 0x0f                                       // 4
+		si.ESInfoLength = uint16(payload[index+3]&0x0f)<<8 | uint16(payload[index+4])       // 12
 		index += 5
 
 		// N2 loop
