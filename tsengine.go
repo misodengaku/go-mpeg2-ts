@@ -2,7 +2,6 @@ package mpeg2ts
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -53,11 +52,9 @@ func (tse *TransportStreamEngine) StartPacketReadLoop(ctx context.Context) <-cha
 				var packetData []byte
 				if syncIndex == -1 {
 					// tse.buffer is dirty. clear and continue
-					fmt.Println("sync byte is not found in buffer", len(tse.buffer))
 					tse.dequeueWithoutLock(len(tse.buffer))
 					continue
 				} else if syncIndex > 0 {
-					fmt.Printf("synced. drop %dbytes\n", syncIndex)
 					tse.dequeueWithoutLock(syncIndex)
 					if len(tse.buffer) >= tse.chunkSize {
 						packetData = tse.dequeueWithoutLock(tse.chunkSize)
@@ -75,7 +72,7 @@ func (tse *TransportStreamEngine) StartPacketReadLoop(ctx context.Context) <-cha
 				copy(packet.Data, packetData)
 				err := packet.parseHeader()
 				if err != nil {
-					fmt.Printf("[ERROR] %s\n", err)
+					continue
 				} else {
 					packetOutChan <- packet
 				}
