@@ -62,6 +62,10 @@ func (p *Packet) ParseTOT() (TOT, error) {
 	if err != nil {
 		return TOT{}, err
 	}
+	tot.TableID = payload[1]
+	if tot.TableID != TableID_TimeOffsetSection {
+		return TOT{}, ErrPacketIsTDT
+	}
 	tot.TDT, err = p.ParseTDT(true)
 	if err != nil {
 		return TOT{}, err
