@@ -36,8 +36,7 @@ const (
 	PID_EIT_Terrestrial2               = PID(0x0026)
 	PID_EIT_Terrestrial3               = PID(0x0027)
 	PID_RST                            = PID(0x0013)
-	PID_TDT                            = PID(0x0014)
-	PID_TOT                            = PID(0x0014)
+	PID_TDT_TOT                        = PID(0x0014)
 	PID_DCT                            = PID(0x0017)
 	PID_DLT                            = PID_DCT
 	PID_DIT                            = PID(0x001e)

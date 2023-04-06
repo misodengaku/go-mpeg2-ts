@@ -15,6 +15,54 @@ const (
 	AdaptationField_PayloadOnly             = 1
 	AdaptationField_AdaptationFieldOnly     = 2
 	AdaptationField_AdaptationFieldFollowed = 3
+
+	// ETSI EN 300 468 V1.17.1 p.24
+	TableID_ProgramAssociationSection                                        = 0x00
+	TableID_ConditionalAccessSection                                         = 0x01
+	TableID_ProgramMapSection                                                = 0x02
+	TableID_TransportStreamDescriptionSection                                = 0x03
+	TableID_NetworkInformationSection_ActualNetwork                          = 0x40
+	TableID_NetworkInformationSection_OtherNetwork                           = 0x41
+	TableID_ServiceDescriptionSection_ActualDVBTransportStream               = 0x42
+	TableID_ServiceDescriptionSection_OtherDVBTransportStream                = 0x46
+	TableID_BouquetAssociationSection                                        = 0x4A
+	TableID_UpdateNotificationTableSection                                   = 0x4B
+	TableID_IP_MACNotificationSection                                        = 0x4C
+	TableID_EventInformationSection_ActualDVBTransportStreamPresentFollowing = 0x4E
+	TableID_EventInformationSection_OtherDVBTransportStreamPresentFollowing  = 0x4F
+	TableID_EventInformationSection_ActualDVBTransportStreamScheduleMin      = 0x50
+	TableID_EventInformationSection_ActualDVBTransportStreamScheduleMax      = 0x5F
+	TableID_EventInformationSection_OtherDVBTransportStreamScheduleMin       = 0x60
+	TableID_EventInformationSection_OtherDVBTransportStreamScheduleMax       = 0x6F
+	TableID_TimeDateSection                                                  = 0x70
+	TableID_RunningStatusSection                                             = 0x71
+	TableID_StuffingSection                                                  = 0x72
+	TableID_TimeOffsetSection                                                = 0x73
+	TableID_ApplicationInformationSection                                    = 0x74
+	TableID_ContainerSection                                                 = 0x75
+	TableID_RelatedContentSection                                            = 0x76
+	TableID_ContentIdentifierSection                                         = 0x77
+	TableID_MPE_FECSection                                                   = 0x78
+	TableID_ResolutionProviderNotificationSection                            = 0x79
+	TableID_MPE_IFECSection                                                  = 0x7A
+	TableID_ProtectionMessageSection                                         = 0x7B
+	TableID_DownloadableFontInfoSection                                      = 0x7C
+	TableID_DiscontinuityInformationSection                                  = 0x7E
+	TableID_SelectionInformationSection                                      = 0x7F
+	TableID_UserDefinedMin                                                   = 0x80
+	TableID_UserDefinedMax                                                   = 0xFE
+	// TableID_Reserved                                                      = 0x04
+	// ...
+	// TableID_Reserved                                                      = 0x3F
+	// TableID_ReservedForFutureUse                                          = 0x43
+	// TableID_ReservedForFutureUse                                          = 0x44
+	// TableID_ReservedForFutureUse                                          = 0x45
+	// TableID_ReservedForFutureUse                                          = 0x47
+	// TableID_ReservedForFutureUse                                          = 0x48
+	// TableID_ReservedForFutureUse                                          = 0x49
+	// TableID_ReservedForFutureUse                                          = 0x4D
+	// TableID_ReservedForFutureUse                                          = 0x7D
+	// TableID_Reserved                                                      = 0xFF
 )
 
 func NewPacketList(chunkSize int) (PacketList, error) {
