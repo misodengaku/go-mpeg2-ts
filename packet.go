@@ -141,8 +141,7 @@ func (p *Packet) GetPayload() ([]byte, error) {
 		return nil, fmt.Errorf("invalid data size")
 	}
 
-	// fmt.Printf("payload: %#v\n", p.Data[4+p.AdaptationField.Size+1:])
-	if p.AdaptationField.Length > 0 {
+	if p.HasAdaptationField() {
 		return p.Data[4+p.AdaptationField.Length+1:], nil
 	}
 	return p.Data[4:], nil
