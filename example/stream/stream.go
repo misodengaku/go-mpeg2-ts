@@ -65,9 +65,9 @@ func main() {
 
 	state := 0
 	pmtPID := -1
-	elementaryPID := uint16(0)
+	elementaryPID := mpeg2ts.PID(0)
 	frameIndex := uint64(0)
-	continuityIndexes := map[uint16]byte{}
+	continuityIndexes := map[mpeg2ts.PID]byte{}
 	stateChanged := true
 	bufTicker := time.NewTicker(27 * time.Millisecond)
 	statTicker := time.NewTicker(1 * time.Second)
@@ -115,7 +115,7 @@ Loop:
 						break
 					}
 				}
-			} else if state == 1 && v.PID == uint16(pmtPID) {
+			} else if state == 1 && v.PID == mpeg2ts.PID(pmtPID) {
 				// PMT receive state
 
 				pmt, err := v.ParsePMT(disableCRCcheck)

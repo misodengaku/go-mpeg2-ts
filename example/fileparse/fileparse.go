@@ -21,7 +21,7 @@ func main() {
 		panic(err)
 	}
 
-	var elementaryPID uint16
+	var elementaryPID mpeg2ts.PID
 	patPackets := mpeg2.FilterByPIDs(mpeg2ts.PID_PAT)
 	for _, p := range patPackets.PacketList.All() {
 		fmt.Println("PAT frame:", p.Index, p.PID)
@@ -66,9 +66,9 @@ func main() {
 	ctx := context.Background()
 	fmt.Printf("Video Stream PID is 0x%04X. start PES dump\n", elementaryPID)
 	pesPackets := mpeg2.FilterByPIDs(elementaryPID)
-	pesParser := mpeg2ts.NewPESParser(ctx, 1500)
+	pesParser := mpeg2ts.NewPESParser(1500)
 
-	c := pesParser.StartPESReadLoop()
+	c := pesParser.StartPESReadLoop(ctx)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
