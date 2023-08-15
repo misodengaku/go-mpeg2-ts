@@ -22,7 +22,7 @@ func main() {
 		panic(err)
 	}
 
-	var elementaryPID uint16
+	var elementaryPID mpeg2ts.PID
 	patPackets := mpeg2.FilterByPIDs(mpeg2ts.PID_PAT)
 	for _, p := range patPackets.PacketList.All() {
 		fmt.Println("PAT frame:", p.Index, p.PID)
